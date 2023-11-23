@@ -1,17 +1,22 @@
 !--------------------------------------------------------------------------------------------------
 !> @author Martin Diehl, KU Leuven
 !> @brief Read data from image files of the visualization toolkit.
+
+! TODO: use minimal c++ parser like tinyxml (https://github.com/leethomason/tinyxml2)
+! look into managing dependencies with conan (https://conan.io/)
 !--------------------------------------------------------------------------------------------------
 module VTI
   use prec
   use zlib
   use base64
   use IO
+  use iso_c_binding
 
   implicit none(type,external)
   private
 
   public :: &
+    VTI_readDataset_int_c, &
     VTI_readDataset_int, &
     VTI_readDataset_real, &
     VTI_readCellsSizeOrigin
@@ -138,16 +143,18 @@ end subroutine VTI_readDataset_raw
 !> @brief Read cells, size, and origin of an VTK image data (*.vti) file.
 !> @details https://vtk.org/Wiki/VTK_XML_Formats
 !--------------------------------------------------------------------------------------------------
-subroutine VTI_readCellsSizeOrigin(cells,geomSize,origin, &
-                                   fileContent)
+subroutine VTI_readCellsSizeOrigin(fileContent_c,string_length,cells,geomSize,origin) bind(C, name="f_VTI_readCellsSizeOrigin")
 
-  integer,     dimension(3), intent(out) :: &
+  character(kind=c_char),          intent(in) :: &
+    fileContent_c
+  integer(c_int), value :: string_length
+  character(len=string_length) :: &
+    fileContent
+  integer(c_int), dimension(3), intent(out) :: &
     cells                                                                                           ! # of cells (across all processes!)
   real(pREAL), dimension(3), intent(out) :: &
     geomSize, &                                                                                     ! size (across all processes!)
     origin                                                                                          ! origin (across all processes!)
-  character(len=*),          intent(in) :: &
-    fileContent
 
   character(len=:), allocatable :: headerType
   logical :: inFile, inImage, compressed
@@ -155,6 +162,7 @@ subroutine VTI_readCellsSizeOrigin(cells,geomSize,origin, &
     startPos, endPos
 
 
+  fileContent = c_str_to_f_str(fileContent_c, string_length)
   cells = -1
   geomSize = -1.0_pREAL
 
@@ -439,5 +447,51 @@ pure function fileFormatOk(line)
                  getXMLValue(line,'compressor') /= 'vtkLZMADataCompressor'
 
 end function fileFormatOk
+
+function c_str_to_f_str(c_string, string_length) result(f_string)
+  integer(c_int), value :: string_length
+  character(kind=c_char), dimension(string_length), intent(in) :: c_string
+  character(len=string_length) :: f_string
+
+  integer :: i, str_length
+
+  str_length = 0
+  do i = 1, string_length
+    if (c_string(i) == c_null_char) exit
+    f_string(i:i) = c_string(i)
+    str_length = str_length + 1
+  end do
+
+end function c_str_to_f_str
+
+!--------------------------------------------------------------------------------------------------
+!> @brief Read integer dataset from a VTK image data (*.vti) file.
+!> @details https://vtk.org/Wiki/VTK_XML_Formats
+!--------------------------------------------------------------------------------------------------
+subroutine VTI_readDataset_int_c(fileContent_c, string_length, label_c, label_length, dataset, dataset_size) &
+  bind(C, name="f_VTI_readDataset_int")
+  character(kind=c_char),          intent(in) :: &
+    fileContent_c, label_c
+  integer(c_int), value,  intent(in) :: string_length, label_length
+  character(len=label_length) :: &
+    label
+  character(len=string_length) :: &
+    fileContent
+  integer :: &
+    dataset_size
+  integer, dimension(dataset_size) :: &
+    dataset
+
+  character(len=:), allocatable :: dataType, headerType, base64Str
+  logical :: compressed
+
+  fileContent = c_str_to_f_str(fileContent_c, string_length)
+  label = c_str_to_f_str(label_c, label_length)
+  call VTI_readDataset_raw(base64Str,dataType,headerType,compressed, &
+                           fileContent,label)
+  dataset = as_Int(base64Str,headerType,compressed,dataType) + 1
+  dataset_size = size(dataset)
+
+end subroutine VTI_readDataset_int_c
 
 end module VTI

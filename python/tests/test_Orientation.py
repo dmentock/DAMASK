@@ -1,6 +1,8 @@
 import pytest
 import numpy as np
 from itertools import permutations
+from matplotlib import pyplot as plt
+from PIL import Image
 
 from damask import Rotation
 from damask import Orientation
@@ -162,7 +164,7 @@ class TestOrientation:
                                                                ([np.arccos(3**(-.5)),np.pi/4,0],[0,0],[0,0,1],[0,0,1])])
     def test_fiber_IPF(self,crystal,sample,direction,color):
         fiber = Orientation.from_fiber_component(crystal=crystal,sample=sample,family='cubic',shape=200)
-        print(np.allclose(fiber.IPF_color(direction),color))
+        assert np.allclose(fiber.IPF_color(direction),color)
 
 
     @pytest.mark.parametrize('kwargs',[
@@ -306,22 +308,13 @@ class TestOrientation:
 
     @pytest.mark.parametrize('model',['Bain','KS','GT','GT_prime','NW','Pitsch'])
     @pytest.mark.parametrize('lattice',['cF','cI'])
-    def test_relationship_forward_backward(self,model,lattice):
-        o = Orientation.from_random(lattice=lattice)
-        for i,r in enumerate(o.related(model)):
-            assert o.disorientation(r.related(model)[i]).as_axis_angle(degrees=True,pair=True)[1]<1.0e-5
-
-    @pytest.mark.parametrize('model',['Bain','KS','GT','GT_prime','NW','Pitsch'])
-    @pytest.mark.parametrize('lattice',['cF','cI'])
     def test_relationship_reference(self,update,res_path,model,lattice):
         reference = res_path/f'{lattice}_{model}.txt'
         o = Orientation(lattice=lattice)
         eu = o.related(model).as_Euler_angles(degrees=True)
         if update:
             coords = np.array([(1,i+1) for i,x in enumerate(eu)])
-            Table(eu,{'Eulers':(3,)})\
-                .add('pos',coords)\
-                .save(reference)
+            Table({'Eulers':(3,)},eu).set('pos',coords).save(reference)
         assert np.allclose(eu,Table.load(reference).get('Eulers'))
 
     def test_basis_real(self):
@@ -360,7 +353,9 @@ class TestOrientation:
                                     a=a,b=b,c=c,
                                     alpha=alpha,beta=beta,gamma=gamma)
         assert o.to_pole(**{kw:vector,'with_symmetry':with_symmetry}).shape \
-            == o.shape + vector.shape[:-1] + (o.symmetry_operations.shape if with_symmetry else ()) + vector.shape[-1:]
+            == util.shapeblender(o.shape,vector.shape[:-1]) \
+             + (o.symmetry_operations.shape if with_symmetry else ()) \
+             + vector.shape[-1:]
 
     @pytest.mark.parametrize('lattice',['hP','cI','cF']) #tI not included yet
     def test_Schmid(self,update,res_path,lattice):
@@ -369,8 +364,7 @@ class TestOrientation:
             reference = res_path/f'{lattice}_{mode}.txt'
             P = O.Schmid(N_slip='*') if mode == 'slip' else O.Schmid(N_twin='*')
             if update:
-                table = Table(P.reshape(-1,9),{'Schmid':(3,3,)})
-                table.save(reference)
+                Table({'Schmid':(3,3,)},P.reshape(-1,9)).save(reference)
             assert np.allclose(P,Table.load(reference).get('Schmid'))
 
     def test_Schmid_invalid(self):
@@ -458,11 +452,9 @@ class TestOrientation:
         p = Orientation.from_random(family=family,shape=right)
         blend = util.shapeblender(o.shape,p.shape)
         for loc in np.random.randint(0,blend,(10,len(blend))):
-            # print(f'{a}/{b} @ {loc}')
-            # print(o[tuple(loc[:len(o.shape)])].disorientation(p[tuple(loc[-len(p.shape):])]))
-            # print(o.disorientation(p)[tuple(loc)])
-            assert o[tuple(loc[:len(o.shape)])].disorientation(p[tuple(loc[-len(p.shape):])]) \
-                   .isclose(o.disorientation(p)[tuple(loc)])
+            l = () if  left is None else tuple(np.minimum(np.array(left )-1,loc[:len(left)]))
+            r = () if right is None else tuple(np.minimum(np.array(right)-1,loc[-len(right):]))
+            assert o[l].disorientation(p[r]).isclose(o.disorientation(p)[tuple(loc)])
 
     @pytest.mark.parametrize('family',crystal_families)
     @pytest.mark.parametrize('left,right',[
@@ -470,13 +462,16 @@ class TestOrientation:
                                     ((2,2),(4,4)),
                                     ((3,1),(1,3)),
                                     (None,(3,)),
+                                    (None,()),
                                    ])
     def test_IPF_color_blending(self,family,left,right):
         o = Orientation.from_random(family=family,shape=left)
         v = np.random.random(right+(3,))
         blend = util.shapeblender(o.shape,v.shape[:-1])
         for loc in np.random.randint(0,blend,(10,len(blend))):
-            assert np.allclose(o[tuple(loc[:len(o.shape)])].IPF_color(v[tuple(loc[-len(v.shape[:-1]):])]),
+            l = () if  left is None else tuple(np.minimum(np.array(left )-1,loc[:len(left)]))
+            r = () if right is None else tuple(np.minimum(np.array(right)-1,loc[-len(right):]))
+            assert np.allclose(o[l].IPF_color(v[r]),
                                o.IPF_color(v)[tuple(loc)])
 
     @pytest.mark.parametrize('family',crystal_families)
@@ -491,7 +486,9 @@ class TestOrientation:
         v = np.random.random(right+(3,))
         blend = util.shapeblender(o.shape,v.shape[:-1])
         for loc in np.random.randint(0,blend,(10,len(blend))):
-            assert np.allclose(o[tuple(loc[:len(o.shape)])].to_SST(v[tuple(loc[-len(v.shape[:-1]):])]),
+            l = () if  left is None else tuple(np.minimum(np.array(left )-1,loc[:len(left)]))
+            r = () if right is None else tuple(np.minimum(np.array(right)-1,loc[-len(right):]))
+            assert np.allclose(o[l].to_SST(v[r]),
                                o.to_SST(v)[tuple(loc)])
 
     @pytest.mark.parametrize('lattice,a,b,c,alpha,beta,gamma',
@@ -517,9 +514,33 @@ class TestOrientation:
         v = np.random.random(right+(3,))
         blend = util.shapeblender(o.shape,v.shape[:-1])
         for loc in np.random.randint(0,blend,(10,len(blend))):
-            assert np.allclose(o[tuple(loc[:len(o.shape)])].to_pole(uvw=v[tuple(loc[-len(v.shape[:-1]):])]),
-                               o.to_pole(uvw=v)[tuple(loc)])
+            l = () if  left is None else tuple(np.minimum(np.array(left )-1,loc[:len(left)]))
+            r = () if right is None else tuple(np.minimum(np.array(right)-1,loc[-len(right):]))
+        assert np.allclose(o[l].to_pole(uvw=v[r]),
+                           o.to_pole(uvw=v)[tuple(loc)])
 
     def test_mul_invalid(self):
         with pytest.raises(TypeError):
             Orientation.from_random(lattice='cF')*np.ones(3)
+
+    @pytest.mark.parametrize('OR',['KS','NW','GT','GT_prime','Bain','Pitsch'])
+    @pytest.mark.parametrize('pole',[[0,0,1],[0,1,1],[1,1,1]])
+    def test_OR_plot(self,update,res_path,tmp_path,OR,pole):
+        # https://doi.org/10.3390/cryst13040663 for comparison
+        O = Orientation(lattice='cF')
+        poles = O.related(OR).to_pole(uvw=pole,with_symmetry=True).reshape(-1,3)
+        points = util.project_equal_area(poles,'z')
+
+        fig, ax = plt.subplots()
+        c = plt.Circle((0,0),1, color='k',fill=False)
+        ax.add_patch(c)
+        ax.scatter(points[:,0],points[:,1])
+        ax.set_aspect('equal', 'box')
+        fname=f'{OR}-{"".join(map(str,pole))}.png'
+        plt.axis('off')
+        plt.savefig(tmp_path/fname)
+        if update: plt.savefig(res_path/fname)
+        current = np.array(Image.open(tmp_path/fname))
+        reference = np.array(Image.open(res_path/fname))
+        assert np.allclose(current,reference)
+

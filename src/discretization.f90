@@ -6,6 +6,7 @@ module discretization
 
   use prec
   use result
+  use iso_c_binding
 
   implicit none(type,external)
   private
@@ -18,7 +19,7 @@ module discretization
   integer,     public, protected, dimension(:),   allocatable :: &
     discretization_materialAt                                                                       !ToDo: discretization_ID_material
 
-  real(pREAL), public, protected, dimension(:,:), allocatable :: &
+  real(pREAL), public, protected, target, dimension(:,:), allocatable :: &
     discretization_IPcoords0, &
     discretization_IPcoords, &
     discretization_NodeCoords0, &
@@ -72,6 +73,28 @@ subroutine discretization_init(materialAt,&
 
 end subroutine discretization_init
 
+!--------------------------------------------------------------------------------------------------
+!> @brief stores the relevant information from the c++ grid solver in globally accesible variables
+!--------------------------------------------------------------------------------------------------
+subroutine discretization_init_c(materialAt, discretization_Nelems, &
+                                 IPcoords0, n_ips, &
+                                 NodeCoords0, n_nodes, &
+                                 sharedNodesBegin) bind(C, name="f_discretization_init")
+
+  integer,          intent(in) :: &
+    discretization_Nelems, n_ips, n_nodes
+  integer,     dimension(discretization_Nelems),   intent(in) :: &
+    materialAt
+  real(pReal), dimension(3,n_ips), intent(in) :: &
+    IPcoords0
+  real(pReal), dimension(3,n_nodes), intent(in) :: &
+    NodeCoords0
+  integer,          intent(in) :: &
+    sharedNodesBegin                                                                                            !< index of first node shared among different processes (MPI)
+
+  call discretization_init(materialAt, IPcoords0, NodeCoords0, sharedNodesBegin)
+
+end subroutine discretization_init_c
 
 !--------------------------------------------------------------------------------------------------
 !> @brief write the displacements
@@ -115,6 +138,22 @@ subroutine discretization_setNodeCoords(NodeCoords)
   discretization_NodeCoords = NodeCoords
 
 end subroutine discretization_setNodeCoords
+
+!--------------------------------------------------------------------------------------------------
+!> @brief pass pointers of fortran-defined IPcoords and NodeCoords arrays to cpp solver
+!--------------------------------------------------------------------------------------------------
+subroutine discretization_fetch_ip_node_coord_pointers(c_ip_coords_ptr, &
+                                                       c_node_coords_ptr) &
+  bind(C, name="f_discretization_fetch_ip_node_coord_pointers")
+
+  type(c_ptr), intent(out) :: &
+    c_ip_coords_ptr, &
+    c_node_coords_ptr
+
+  c_ip_coords_ptr = c_loc(discretization_IPcoords)
+  c_node_coords_ptr = c_loc(discretization_NodeCoords)
+
+end subroutine discretization_fetch_ip_node_coord_pointers
 
 
 end module discretization

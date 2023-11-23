@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.12.0)
 include(FindPkgConfig REQUIRED)
 
 if(DEFINED ENV{PETSC_DIR})
-    message("PETSC_DIR:\n$ENV{PETSC_DIR}\n")
+    message("PETSC_DIR:\n$ENV{PETSC_DIR}/$ENV{PETSC_ARCH}\n")
 else()
     message(FATAL_ERROR "PETSc location (PETSC_DIR) is not defined")
 endif()
@@ -11,15 +11,17 @@ endif()
 project(Prerequisites LANGUAGES)
 set(ENV{PKG_CONFIG_PATH} "$ENV{PETSC_DIR}/$ENV{PETSC_ARCH}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 pkg_check_modules(PETSC_MIN REQUIRED PETSc>=3.12.0 QUIET) #CMake does not support version range
-pkg_check_modules(PETSC REQUIRED PETSc<3.20.0)
+pkg_check_modules(PETSC REQUIRED PETSc<3.21.0)
 
 pkg_get_variable(CMAKE_Fortran_COMPILER PETSc fcompiler)
 pkg_get_variable(CMAKE_C_COMPILER PETSc ccompiler)
+pkg_get_variable(CMAKE_CXX_COMPILER PETSc cxxcompiler)
+
 
 # Solver determines name of project
 string(TOUPPER "${DAMASK_SOLVER}" DAMASK_SOLVER)
 if(DAMASK_SOLVER STREQUAL "GRID")
-    project(damask-grid HOMEPAGE_URL https://damask.mpie.de LANGUAGES Fortran C)
+    project(damask-grid HOMEPAGE_URL https://damask.mpie.de LANGUAGES Fortran C CXX)
 elseif(DAMASK_SOLVER STREQUAL "MESH")
     project(damask-mesh HOMEPAGE_URL https://damask.mpie.de LANGUAGES Fortran C)
 elseif(DAMASK_SOLVER STREQUAL "TEST")
@@ -130,7 +132,10 @@ set(CMAKE_Fortran_FLAGS_${CMAKE_BUILD_TYPE} "${CMAKE_Fortran_FLAGS_${CMAKE_BUILD
 set(CMAKE_Fortran_LINK_EXECUTABLE "${CMAKE_Fortran_LINK_EXECUTABLE} <OBJECTS> -o <TARGET> <LINK_LIBRARIES> -L${PETSC_LIBRARY_DIRS} -lpetsc ${PETSC_EXTERNAL_LIB} -lz")
 
 if(fYAML_FOUND STREQUAL "1")
-    set(CMAKE_Fortran_LINK_EXECUTABLE "${CMAKE_Fortran_LINK_EXECUTABLE} -L${fYAML_LIBRARY_DIRS} -l${fYAML_LIBRARIES}")
+    set(CMAKE_Fortran_LINK_EXECUTABLE "${CMAKE_Fortran_LINK_EXECUTABLE} -L${fYAML_LIBRARY_DIRS}")
+    foreach(fYAML_LIBRARY ${fYAML_LIBRARIES})
+        set(CMAKE_Fortran_LINK_EXECUTABLE "${CMAKE_Fortran_LINK_EXECUTABLE} -L${fYAML_LIBRARY_DIRS} -l${fYAML_LIBRARY}")
+    endforeach()
     add_definitions(-DFYAML)
     pkg_get_variable(fYAML_INCLUDE_DIR libfyaml includedir) # fYAML_INCLUDE_DIRS and fYAML_CFLAGS are not working
     set(CMAKE_C_FLAGS_${CMAKE_BUILD_TYPE} "${CMAKE_C_FLAGS_${CMAKE_BUILD_TYPE}} -I${fYAML_INCLUDE_DIR}")

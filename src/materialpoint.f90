@@ -20,7 +20,7 @@ module materialpoint
   use rotations
   use polynomials
   use tables
-  use lattice
+  use crystal
   use material
   use phase
   use homogenization
@@ -30,7 +30,7 @@ module materialpoint
   use discretization_mesh
 #elif defined(GRID)
   use base64
-  use discretization_grid
+  use iso_c_binding
 #endif
 
   implicit none(type,external)
@@ -43,6 +43,80 @@ contains
 !> @brief Initialize all modules.
 !--------------------------------------------------------------------------------------------------
 subroutine materialpoint_initAll()
+
+  call materialpoint_initBase()
+  call materialpoint_initDamask()
+
+end subroutine materialpoint_initAll
+
+function c_str_to_f_str(c_string, string_length) result(f_string)
+  integer(c_int), value :: string_length
+  character(kind=c_char), dimension(string_length), intent(in) :: c_string
+  character(len=string_length) :: f_string
+
+  integer :: i, str_length
+
+  str_length = 0
+  do i = 1, string_length
+    if (c_string(i) == c_null_char) exit
+    f_string(i:i) = c_string(i)
+    str_length = str_length + 1
+  end do
+
+end function c_str_to_f_str
+
+subroutine materialpoint_initBase_c(material_path_c, material_path_len, &
+                                    load_path_c, load_path_len, &
+                                    grid_path_c, grid_path_len, &
+                                    numerics_path_c, numerics_path_len) &
+  bind(C, name="f_materialpoint_initBase")
+  character(kind=c_char), intent(in) :: &
+    material_path_c, &
+    load_path_c, &
+    grid_path_c, &
+    numerics_path_c
+  integer(c_int), value, intent(in) :: &
+    material_path_len, &
+    load_path_len, &
+    grid_path_len, &
+    numerics_path_len
+
+  character(len=material_path_len) :: &
+    material_path
+  character(len=load_path_len) :: &
+    load_path
+  character(len=grid_path_len) :: &
+    grid_path
+  character(len=numerics_path_len) :: &
+    numerics_path
+
+  call parallelization_init()
+  material_path = c_str_to_f_str(material_path_c, material_path_len)
+  load_path = c_str_to_f_str(load_path_c, load_path_len)
+  grid_path = c_str_to_f_str(grid_path_c, grid_path_len)
+
+  if (numerics_path_len>0) then
+    numerics_path = c_str_to_f_str(numerics_path_c, numerics_path_len)
+   call CLI_init(material_path, load_path, grid_path, numerics_path)                                                                     ! grid and mesh commandline interface
+  else
+    call CLI_init(material_path, load_path, grid_path)                                                                                   ! grid and mesh commandline interface
+  end if
+  call signal_init()
+  call prec_init()
+  call misc_init()
+  call IO_init()
+#if   defined(MESH)
+  call FEM_quadrature_init()
+#elif defined(GRID)
+   call base64_init()
+#endif
+  call YAML_types_init()
+  call YAML_parse_init()
+  call HDF5_utilities_init()
+
+end subroutine materialpoint_initBase_c
+
+subroutine materialpoint_initBase()
 
   call parallelization_init()
   call CLI_init()                                                                                   ! grid and mesh commandline interface
@@ -58,17 +132,20 @@ subroutine materialpoint_initAll()
   call YAML_types_init()
   call YAML_parse_init()
   call HDF5_utilities_init()
+
+end subroutine materialpoint_initBase
+
+subroutine materialpoint_initDamask() bind(C, name="f_materialpoint_initDamask")
+
   call result_init(restart=CLI_restartInc>0)
   call config_init()
   call math_init()
   call rotations_init()
   call polynomials_init()
   call tables_init()
-  call lattice_init()
+  call crystal_init()
 #if   defined(MESH)
   call discretization_mesh_init(restart=CLI_restartInc>0)
-#elif defined(GRID)
-  call discretization_grid_init(restart=CLI_restartInc>0)
 #endif
   call material_init(restart=CLI_restartInc>0)
   call phase_init()
@@ -76,7 +153,8 @@ subroutine materialpoint_initAll()
   call materialpoint_init()
   call config_material_deallocate()
 
-end subroutine materialpoint_initAll
+end subroutine materialpoint_initDamask
+
 
 
 !--------------------------------------------------------------------------------------------------
@@ -91,7 +169,7 @@ subroutine materialpoint_init()
 
 
   if (CLI_restartInc > 0) then
-    print'(/,a,i0,a)', ' reading restart information of increment from file'; flush(IO_STDOUT)
+    print'(/,1x,a,1x,i0)', 'loading restart information of increment',CLI_restartInc; flush(IO_STDOUT)
 
     fileHandle = HDF5_openFile(getSolverJobName()//'_restart.hdf5','r')
 
@@ -127,7 +205,7 @@ end subroutine materialpoint_restartWrite
 !--------------------------------------------------------------------------------------------------
 !> @brief Forward data for new time increment.
 !--------------------------------------------------------------------------------------------------
-subroutine materialpoint_forward()
+subroutine materialpoint_forward() bind(C, name="f_materialpoint_forward")
 
   call homogenization_forward()
   call phase_forward()
@@ -138,7 +216,7 @@ end subroutine materialpoint_forward
 !--------------------------------------------------------------------------------------------------
 !> @brief Trigger writing of results.
 !--------------------------------------------------------------------------------------------------
-subroutine materialpoint_result(inc,time)
+subroutine materialpoint_result(inc,time) bind(C, name="f_materialpoint_result")
 
   integer,     intent(in) :: inc
   real(pREAL), intent(in) :: time

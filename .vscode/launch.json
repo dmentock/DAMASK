@@ -1,0 +1,239 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [       
+          {
+            "name": "Debug main",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/DAMASK_grid",
+            "args": [
+              "-g", "${workspaceFolder}/examples/grid/20grains16x16x16.vti",
+              "-m", "${workspaceFolder}/examples/grid/material.yaml",
+              "-l", "${workspaceFolder}/examples/grid/tensionX.yaml",
+              "-n", "${workspaceFolder}/examples/grid/numerics.yaml"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build with Make"
+          },
+          {
+            "name": "Debug DiscretizationGrid",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/solver_unittests/test_discretization_grid",
+            // // "args": ["--gtest_filter=DiscretizationGridSetup.TestInit"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [  
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build with Make"
+          },      
+          {
+            "name": "Debug FFT",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/solver_unittests/test_fft",
+            "args": ["--gtest_filter=TestFFT.TestInitForwardBackwardDirectAssignment"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [  
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build with Make"
+        },
+        {
+          "name": "Debug Spectral",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "${workspaceFolder}/bin/solver_unittests/test_spectral",
+          "args": ["--gtest_filter=GridTestSetup.SpectralTestConstitutiveResponse"],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [],
+          "externalConsole": false,
+          "MIMode": "gdb",
+          "setupCommands": [  
+              {
+                  "description": "Enable pretty-printing for gdb",
+                  "text": "-enable-pretty-printing",
+                  "ignoreFailures": true
+              },
+              {
+                  "description": "Set Disassembly Flavor to Intel",
+                  "text": "-gdb-set disassembly-flavor intel",
+                  "ignoreFailures": true
+              }
+          ],
+          "preLaunchTask": "Build with Make"
+      },      
+      {
+          "name": "Debug MechBase",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "${workspaceFolder}/bin/solver_unittests/test_mech_base",
+          // "args": ["--gtest_filter=GridTestSetup.MechBaseTestGammaConvolution"],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [],
+          "externalConsole": false,
+          "MIMode": "gdb",
+          "setupCommands": [  
+              {
+                  "description": "Enable pretty-printing for gdb",
+                  "text": "-enable-pretty-printing",
+                  "ignoreFailures": true
+              },
+              {
+                  "description": "Set Disassembly Flavor to Intel",
+                  "text": "-gdb-set disassembly-flavor intel",
+                  "ignoreFailures": true
+              }
+          ],
+          "preLaunchTask": "Build with Make"
+      },
+      {
+        "name": "Debug MechSolverBasic",
+        "type": "cppdbg",
+        "request": "launch",
+        "program": "${workspaceFolder}/bin/solver_unittests/test_mech_solver_basic",
+        // // "args": ["--gtest_filter=GridTestSetup.TestMechSolverBasicUpdateCoords"],
+        "stopAtEntry": false,
+        "cwd": "${workspaceFolder}",
+        "environment": [],
+        "externalConsole": false,
+        "MIMode": "gdb",
+        "setupCommands": [  
+            {
+                "description": "Enable pretty-printing for gdb",
+                "text": "-enable-pretty-printing",
+                "ignoreFailures": true
+            },
+            {
+                "description": "Set Disassembly Flavor to Intel",
+                "text": "-gdb-set disassembly-flavor intel",
+                "ignoreFailures": true
+            }
+        ],
+        "preLaunchTask": "Build with Make"
+      },  
+
+      {
+          "name": "Debug Config",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "${workspaceFolder}/bin/solver_unittests/test_config",
+          // "args": ["--gtest_filter=NumYamlSetup.TestYamlReadSuccess"],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [],
+          "externalConsole": false,
+          "MIMode": "gdb",
+          "setupCommands": [
+              {
+                  "description": "Enable pretty-printing for gdb",
+                  "text": "-enable-pretty-printing",
+                  "ignoreFailures": true
+              },
+              {
+                  "description": "Set Disassembly Flavor to Intel",
+                  "text": "-gdb-set disassembly-flavor intel",
+                  "ignoreFailures": true
+              }
+          ],
+          "preLaunchTask": "Build with Make"
+      },
+      {
+          "name": "Test FortranInterface",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "${workspaceFolder}/bin/solver_unittests/test_cpp_fortran_interface",
+          // "args": ["--gtest_filter=InterfaceTest.TestInterfaceString"],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [],
+          "externalConsole": false,
+          "MIMode": "gdb",
+          "setupCommands": [  
+              {
+                  "description": "Enable pretty-printing for gdb",
+                  "text": "-enable-pretty-printing",
+                  "ignoreFailures": true
+              },
+              {
+                  "description": "Set Disassembly Flavor to Intel",
+                  "text": "-gdb-set disassembly-flavor intel",
+                  "ignoreFailures": true
+              }
+          ],
+          "preLaunchTask": "Build with Make"
+      },
+      {
+        "name": "Test Damask Grid",
+        "type": "cppdbg",
+        "request": "launch",
+        "program": "${workspaceFolder}/bin/solver_unittests/test_damask_grid",
+        "args": ["--gtest_filter=GridTestSetup.TestDamaskGridLoopOverLoadcase"],
+        "stopAtEntry": false,
+        "cwd": "${workspaceFolder}",
+        "environment": [],
+        "externalConsole": false,
+        "MIMode": "gdb",
+        "setupCommands": [  
+            {
+                "description": "Enable pretty-printing for gdb",
+                "text": "-enable-pretty-printing",
+                "ignoreFailures": true
+            },
+            {
+                "description": "Set Disassembly Flavor to Intel",
+                "text": "-gdb-set disassembly-flavor intel",
+                "ignoreFailures": true
+            }
+        ],
+        "preLaunchTask": "Build with Make"
+    },  
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+      {
+        "label": "Build grid",
+        "type": "shell",
+        "command": "make",
+        "args": [
+          "--build",
+          "build",
+          "--config",
+          "Debug"
+        ],
+        "group": {
+            "kind": "build",
+            "isDefault": true
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Build with Make",
+        "type": "shell",
+        "command": "make grid BUILD_TYPE=DEBUG",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "presentation": {
+          "reveal": "always"
+        },
+        "options": {
+          "cwd": "${workspaceFolder}"
+        }
+      },
+      {
+        "label": "Run all tests",
+        "type": "shell",
+        "command": "find ${workspaceFolder}/bin/solver_unittests/ -maxdepth 1 -name 'test_*' -executable -exec {} \\;",
+        "dependsOn": ["Build project"],
+        "problemMatcher": []
+      } 
+  ]
+}

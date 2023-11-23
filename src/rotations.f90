@@ -92,6 +92,7 @@ module rotations
 
   public :: &
     rotations_init, &
+    rotations_selfTest, &
     eu2om
 
 contains
@@ -99,14 +100,14 @@ contains
 !--------------------------------------------------------------------------------------------------
 !> @brief Do self test.
 !--------------------------------------------------------------------------------------------------
-subroutine rotations_init
+subroutine rotations_init()
 
   print'(/,1x,a)', '<<<+-  rotations init  -+>>>'; flush(IO_STDOUT)
 
   print'(/,1x,a)', 'D. Rowenhorst et al., Modelling and Simulation in Materials Science and Engineering 23:083501, 2015'
   print'(  1x,a)', 'https://doi.org/10.1088/0965-0393/23/8/083501'
 
-  call selfTest()
+  call rotations_selfTest()
 
 end subroutine rotations_init
 
@@ -326,6 +327,44 @@ pure function rotTensor4(self,T,active) result(tRot)
 
 end function rotTensor4
 
+! rotation representation in c++ solver is quaternion, need to create fortran object first
+subroutine rotate_tensor4_c(qu, T, rotated, active) bind(C, name="f_rotate_tensor4")
+  real(c_double), intent(in), dimension(4) :: qu
+  real(c_double), intent(in), dimension(3,3,3,3) :: T
+  real(c_double), intent(out), dimension(3,3,3,3) :: rotated
+  integer, intent(in) :: active
+  logical             :: active_logical
+  type(tRotation) :: rot
+
+  rot%q = qu
+  if (active==1) then
+     active_logical = .true.
+  else
+     active_logical = .false.
+  end if
+  rotated = rot%rotTensor4(T, active_logical)
+
+end subroutine rotate_tensor4_c
+
+! rotation representation in c++ solver is quaternion, need to create fortran object first
+subroutine rotate_tensor2_c(qu, T, rotated, active) bind(C, name="f_rotate_tensor2")
+  real(c_double), intent(in), dimension(4) :: qu
+  real(c_double),     intent(in),  dimension(3,3) :: T
+  real(c_double),     intent(out), dimension(3,3) :: rotated
+  integer, intent(in) :: active
+  logical             :: active_logical
+  type(tRotation) :: rot
+
+  rot%q = qu
+  if (active==1) then
+     active_logical = .true.
+  else
+     active_logical = .false.
+  end if
+  rotated = rot%rotTensor2(T, active_logical)
+
+end subroutine rotate_tensor2_c
+
 
 !--------------------------------------------------------------------------------------------------
 !> @brief Rotate a rank-4 stiffness tensor in Voigt 6x6 notation passively (default) or actively.
@@ -407,6 +446,14 @@ pure function qu2om(qu) result(om)
 
 end function qu2om
 
+! c++ equivalent, since array returns are illegal for bindc functions
+subroutine qu2om_c(qu, om) bind(C, name="f_qu2om")
+  real(c_double), intent(in), dimension(4) :: qu
+  real(c_double), intent(out), dimension(3,3) :: om
+
+  om = qu2om(qu)
+
+end subroutine qu2om_c
 
 !--------------------------------------------------------------------------------------------------
 !> @author Marc De Graef, Carnegie Mellon University
@@ -757,7 +804,7 @@ end function conjugateQuaternion
 !--------------------------------------------------------------------------------------------------
 !> @brief Check correctness of some rotations functions.
 !--------------------------------------------------------------------------------------------------
-subroutine selfTest()
+subroutine rotations_selfTest()
 
   type(tRotation)                 :: R
   real(pREAL), dimension(4)       :: qu
@@ -841,7 +888,7 @@ subroutine selfTest()
 
   end function quaternion_equal
 
-end subroutine selfTest
+end subroutine rotations_selfTest
 
 
 end module rotations

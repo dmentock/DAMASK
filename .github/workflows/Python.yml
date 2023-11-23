@@ -9,8 +9,8 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.10']
-        os: [ubuntu-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+        os: [ubuntu-latest, macos-latest, windows-latest]
       fail-fast: false
 
     steps:
@@ -80,20 +80,4 @@ jobs:
       - name: Run unit tests
         run: |
           export PYTHONPATH=${PWD}/python
-          COLUMNS=256 pytest python/tests/test_util.py::TestUtil::test_extend_docstring_parameters_string[standard] 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
+          COLUMNS=256 pytest python

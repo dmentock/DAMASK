@@ -1,40 +1,63 @@
-# special flags for some files
-if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-    # long lines for interaction matrix
-    set_source_files_properties("lattice.f90" PROPERTIES COMPILE_FLAGS "-ffree-line-length-240")
-    set_source_files_properties("parallelization.f90" PROPERTIES COMPILE_FLAGS "-ffree-line-length-none")
-endif()
-
 file(GLOB damask-sources CONFIGURE_DEPENDS *.f90 *.c)
 
 if(PROJECT_NAME STREQUAL "damask-grid")
     set(executable-name "DAMASK_grid")
-    file(GLOB solver-sources CONFIGURE_DEPENDS grid/*.f90)
-elseif(PROJECT_NAME STREQUAL "damask-mesh")
-    set(executable-name "DAMASK_mesh")
-    file(GLOB solver-sources CONFIGURE_DEPENDS mesh/*.f90)
-elseif(PROJECT_NAME STREQUAL "damask-test")
-    set(executable-name "DAMASK_test")
-    file(GLOB solver-sources CONFIGURE_DEPENDS test/*.f90)
-endif()
+    set(PETSC_ARCH_DIR $ENV{PETSC_DIR}/$ENV{PETSC_ARCH})
+    set(FFTW_LIBRARIES "${PETSC_ARCH_DIR}/lib/libfftw3_mpi.a" "${PETSC_ARCH_DIR}/lib/libfftw3.a")
+    set(LAPACK_LIBRARIES "${PETSC_ARCH_DIR}/lib/libflapack.a")
+    set(BLAS_LIBRARIES "${PETSC_ARCH_DIR}/lib/libfblas.a")
+    set(HDF5_ROOT "${PETSC_ARCH_DIR}")
 
-foreach(solver-source ${solver-sources})
-    file(READ ${solver-source} content)
-    string(FIND "${content}" "CHKERR" found)
-    if((NOT ${found} EQUAL -1) AND (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU"))
-        set_source_files_properties(${solver-source} PROPERTIES COMPILE_FLAGS "-ffree-line-length-none")
-    endif()
-endforeach()
+    find_package(yaml-cpp REQUIRED)
+    find_library(FYAML_LIBRARY NAMES fyaml)
+    find_package(OpenMP REQUIRED)
+    find_package(HDF5 REQUIRED COMPONENTS C Fortran HL)
+    find_package(ZLIB REQUIRED)
+    find_package(Eigen3 REQUIRED)
+    
+    link_directories(${PETSC_ARCH_DIR}/lib)
+    include_directories(
+      $ENV{PETSC_DIR}/include
+      ${PETSC_ARCH_DIR}/include
+      ${EIGEN3_INCLUDE_DIR}
+      grid)
 
+    add_library(fortran_library OBJECT ${damask-sources} grid/base64.f90)
+    target_link_libraries(fortran_library PUBLIC
+                          ${LAPACK_LIBRARIES}
+                          ${BLAS_LIBRARIES}
+                          ${PETSC_ARCH_DIR}/lib/libpetsc.so
+                          HDF5::HDF5
+                          ${FYAML_LIBRARY}
+                          OpenMP::OpenMP_CXX)
 
-if(NOT CMAKE_BUILD_TYPE STREQUAL "SYNTAXONLY")
-    add_executable(${executable-name} ${damask-sources} ${solver-sources})
+    add_subdirectory(grid)
+    add_executable(${executable-name} grid/main.cpp)
+    target_link_libraries(${executable-name}
+                          PUBLIC
+                          fortran_library
+                          damask_grid_lib)
     install(TARGETS ${executable-name} RUNTIME DESTINATION bin)
+
 else()
-    add_library(${executable-name} OBJECT ${damask-sources} ${solver-sources})
-    exec_program(mktemp OUTPUT_VARIABLE nothing)
-    exec_program(mktemp ARGS -d OUTPUT_VARIABLE black_hole)
-    install(PROGRAMS ${nothing} DESTINATION ${black_hole})
+    if(PROJECT_NAME STREQUAL "damask-mesh")
+        set(executable-name "DAMASK_mesh")
+        file(GLOB solver-sources CONFIGURE_DEPENDS mesh/*.f90)
+    elseif(PROJECT_NAME STREQUAL "damask-test")
+        set(executable-name "DAMASK_test")
+        file(GLOB solver-sources CONFIGURE_DEPENDS test/*.f90)
+    endif()
+
+    if(NOT CMAKE_BUILD_TYPE STREQUAL "SYNTAXONLY")
+
+        add_executable(${executable-name} ${damask-sources} ${solver-sources})
+        install(TARGETS ${executable-name} RUNTIME DESTINATION bin)
+    else()
+        add_library(${executable-name} OBJECT ${damask-sources} ${solver-sources})
+        exec_program(mktemp OUTPUT_VARIABLE nothing)
+        exec_program(mktemp ARGS -d OUTPUT_VARIABLE black_hole)
+        install(PROGRAMS ${nothing} DESTINATION ${black_hole})
+    endif()
 endif()
 
 string(REPLACE ";" "\n" sources "${damask-sources};${solver-sources}")

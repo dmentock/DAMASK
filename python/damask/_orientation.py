@@ -3,7 +3,7 @@ from typing import Optional, Union, TypeVar
 
 import numpy as np
 
-from ._typehints import FloatSequence, IntSequence, CrystalFamily, CrystalLattice
+from ._typehints import FloatSequence, IntSequence, CrystalFamily, BravaisLattice
 from . import Rotation
 from . import Crystal
 from . import util
@@ -73,7 +73,7 @@ class Orientation(Rotation,Crystal):
                  rotation: Union[FloatSequence, Rotation] = np.array([1.,0.,0.,0.]),
                  *,
                  family: Optional[CrystalFamily] = None,
-                 lattice: Optional[CrystalLattice] = None,
+                 lattice: Optional[BravaisLattice] = None,
                  a: Optional[float] = None, b: Optional[float] = None, c: Optional[float] = None,
                  alpha: Optional[float] = None, beta: Optional[float] = None, gamma: Optional[float] = None,
                  degrees: bool = False):
@@ -241,13 +241,6 @@ class Orientation(Rotation,Crystal):
 
 
     @classmethod
-    @util.extend_docstring(Rotation.from_random,
-                           adopted_parameters=Crystal.__init__)
-    @util.pass_on('rotation', Rotation.from_random, wrapped=__init__)
-    def from_random(cls, **kwargs) -> 'Orientation':
-        return cls(**kwargs)
-
-    @classmethod
     @util.extend_docstring(Rotation.from_quaternion,
                            adopted_parameters=Crystal.__init__)
     @util.pass_on('rotation', Rotation.from_quaternion, wrapped=__init__)
@@ -283,6 +276,13 @@ class Orientation(Rotation,Crystal):
         return cls(**kwargs)
 
     @classmethod
+    @util.extend_docstring(Rotation.from_parallel,
+                           adopted_parameters=Crystal.__init__)
+    @util.pass_on('rotation', Rotation.from_parallel, wrapped=__init__)
+    def from_parallel(cls, **kwargs) -> 'Orientation':
+        return cls(**kwargs)
+
+    @classmethod
     @util.extend_docstring(Rotation.from_Rodrigues_vector,
                            adopted_parameters=Crystal.__init__)
     @util.pass_on('rotation', Rotation.from_Rodrigues_vector, wrapped=__init__)
@@ -301,6 +301,20 @@ class Orientation(Rotation,Crystal):
                            adopted_parameters=Crystal.__init__)
     @util.pass_on('rotation', Rotation.from_cubochoric, wrapped=__init__)
     def from_cubochoric(cls, **kwargs) -> 'Orientation':
+        return cls(**kwargs)
+
+    @classmethod
+    @util.extend_docstring(Rotation.from_random,
+                           adopted_parameters=Crystal.__init__)
+    @util.pass_on('rotation', Rotation.from_random, wrapped=__init__)
+    def from_random(cls, **kwargs) -> 'Orientation':
+        return cls(**kwargs)
+
+    @classmethod
+    @util.extend_docstring(Rotation.from_ODF,
+                           adopted_parameters=Crystal.__init__)
+    @util.pass_on('rotation', Rotation.from_ODF, wrapped=__init__)
+    def from_ODF(cls, **kwargs) -> 'Orientation':
         return cls(**kwargs)
 
     @classmethod
@@ -325,7 +339,7 @@ class Orientation(Rotation,Crystal):
                         hkl: FloatSequence,
                         **kwargs) -> 'Orientation':
         """
-        Initialize orientation object from two crystallographic directions.
+        Initialize orientation object from the crystallographic direction and plane parallel to lab x and z, respectively.
 
         Parameters
         ----------
@@ -434,30 +448,20 @@ class Orientation(Rotation,Crystal):
         https://doi.org/10.1107/S0108767391006864
 
         """
-        rho = self.as_Rodrigues_vector(compact=True)*(1.0-1.0e-9)
+        def larger_or_equal(v,c):
+            return ((np.isclose(c[0],v[...,0]) | (v[...,0] > c[0])) &
+                    (np.isclose(c[1],v[...,1]) | (v[...,1] > c[1])) &
+                    (np.isclose(c[2],v[...,2]) | (v[...,2] > c[2]))).astype(bool)
 
-        with np.errstate(invalid='ignore'):
-            if   self.family == 'cubic':
-                return ((rho[...,0] >= rho[...,1]) &
-                        (rho[...,1] >= rho[...,2]) &
-                        (rho[...,2] >= 0)).astype(bool)
-            if self.family == 'hexagonal':
-                return ((rho[...,0] >= rho[...,1]*np.sqrt(3)) &
-                        (rho[...,1] >= 0) &
-                        (rho[...,2] >= 0)).astype(bool)
-            if self.family == 'tetragonal':
-                return ((rho[...,0] >= rho[...,1]) &
-                        (rho[...,1] >= 0) &
-                        (rho[...,2] >= 0)).astype(bool)
-            if self.family == 'orthorhombic':
-                return ((rho[...,0] >= 0) &
-                        (rho[...,1] >= 0) &
-                        (rho[...,2] >= 0)).astype(bool)
-            if self.family == 'monoclinic':
-                return ((rho[...,1] >= 0) &
-                        (rho[...,2] >= 0)).astype(bool)
+        rho  = self.as_Rodrigues_vector(compact=True)
+        return larger_or_equal(rho,
+                                     [rho[...,1],           rho[...,2],0] if self.family == 'cubic'
+                                else [rho[...,1]*np.sqrt(3),0,         0] if self.family == 'hexagonal'
+                                else [rho[...,1],           0,         0] if self.family == 'tetragonal'
+                                else [0,                    0,         0] if self.family == 'orthorhombic'
+                                else [-np.inf,              0,         0] if self.family == 'monoclinic'
+                                else [-np.inf,        -np.inf,   -np.inf]) & self.in_FZ
 
-            return np.ones_like(rho[...,0],dtype=bool)
 
     def disorientation(self,
                        other: 'Orientation',
@@ -521,20 +525,21 @@ class Orientation(Rotation,Crystal):
         if self.family != other.family:
             raise NotImplementedError('disorientation between different crystal families')
 
-        blend = util.shapeblender(self.shape,other.shape)
-        s = self.equivalent
-        o = other.equivalent
+        blend = util.shapeblender( self.shape,other.shape)
+        s_m   = util.shapeshifter( self.shape,blend,mode='right')
+        s_o   = util.shapeshifter(other.shape,blend,mode='left')
 
-        s_ = s.reshape((s.shape[0],1)+ self.shape).broadcast_to((s.shape[0],o.shape[0])+blend,mode='right')
-        o_ = o.reshape((1,o.shape[0])+other.shape).broadcast_to((s.shape[0],o.shape[0])+blend,mode='right')
-        r_ = s_.misorientation(o_)
+        s =  self.broadcast_to(s_m).equivalent
+        o = other.broadcast_to(s_o).equivalent
+
+        r_ = s[:,np.newaxis,...].misorientation(o[np.newaxis,:,...]) # type: ignore[index]
         _r = ~r_
 
-        forward = r_.in_FZ & r_.in_disorientation_FZ
-        reverse = _r.in_FZ & _r.in_disorientation_FZ
+        forward = r_.in_disorientation_FZ
+        reverse = _r.in_disorientation_FZ
         ok  = forward | reverse
-        ok &= (np.cumsum(ok.reshape((-1,)+ok.shape[2:]),axis=0) == 1).reshape(ok.shape)
-        r = np.where(np.any(forward[...,np.newaxis],axis=(0,1),keepdims=True),
+        ok &= (np.cumsum(ok.reshape((-1,)+blend),axis=0) == 1).reshape(ok.shape)
+        r = np.where(np.any((ok&forward)[...,np.newaxis],axis=(0,1),keepdims=True),
                      r_.quaternion,
                      _r.quaternion)
         loc  = np.where(ok)
@@ -584,6 +589,7 @@ class Orientation(Rotation,Crystal):
                                                    np.argmin(m,axis=0)[np.newaxis,...,np.newaxis],
                                                    axis=0),
                                 axis=0))
+
         return ((self.copy(Rotation(r).average(weights)),self.copy(Rotation(r))) if return_cloud else
                 self.copy(Rotation(r).average(weights))
                )
@@ -620,17 +626,19 @@ class Orientation(Rotation,Crystal):
         vector_ = np.array(vector,float)
         if vector_.shape[-1] != 3:
             raise ValueError('input is not a field of three-dimensional vectors')
-        eq  = self.equivalent
-        blend = util.shapeblender(eq.shape,vector_.shape[:-1])
-        poles = eq.broadcast_to(blend,mode='right') @ np.broadcast_to(vector_,blend+(3,))
+
+        blend = util.shapeblender( self.shape,vector_.shape[:-1])
+        eq    = self.broadcast_to(util.shapeshifter( self.shape,blend,mode='right')).equivalent
+        poles = np.atleast_2d(eq @ np.broadcast_to(vector_,(1,)+blend+(3,)))
         ok    = self.in_SST(poles,proper=proper)
         ok   &= np.cumsum(ok,axis=0) == 1
         loc   = np.where(ok)
         sort  = 0 if len(loc) == 1 else np.lexsort(loc[:0:-1])
+
         return (
-                (poles[ok][sort].reshape(blend[1:]+(3,)), (np.vstack(loc[:1]).T)[sort].reshape(blend[1:]))
+                (poles[ok][sort].reshape(blend+(3,)), (np.vstack(loc[:1]).T)[sort].reshape(blend))
                 if return_operators else
-                poles[ok][sort].reshape(blend[1:]+(3,))
+                poles[ok][sort].reshape(blend+(3,))
                )
 
 
@@ -795,16 +803,17 @@ class Orientation(Rotation,Crystal):
 
         """
         v = self.to_frame(uvw=uvw,hkl=hkl)
-        blend = util.shapeblender(self.shape,v.shape[:-1])
+        s_v = v.shape[:-1]
+        blend = util.shapeblender(self.shape,s_v)
         if normalize:
-            v /= np.linalg.norm(v,axis=-1,keepdims=len(v.shape)>1)
+            v /= np.linalg.norm(v,axis=-1,keepdims=len(s_v)>0)
         if with_symmetry:
             sym_ops = self.symmetry_operations
-            shape = v.shape[:-1]+sym_ops.shape
+            s_v   += sym_ops.shape
             blend += sym_ops.shape
-            v = sym_ops.broadcast_to(shape) \
-              @ np.broadcast_to(v.reshape(util.shapeshifter(v.shape,shape+(3,))),shape+(3,))
-        return ~(self.broadcast_to(blend))@ np.broadcast_to(v,blend+(3,))
+            v = sym_ops.broadcast_to(s_v) @ v[...,np.newaxis,:]
+
+        return ~(self.broadcast_to(blend)) @ np.broadcast_to(v,blend+(3,))
 
 
     def Schmid(self, *,
@@ -833,7 +842,7 @@ class Orientation(Rotation,Crystal):
         >>> import damask
         >>> np.set_printoptions(3,suppress=True,floatmode='fixed')
         >>> O = damask.Orientation.from_Euler_angles(phi=[0,45,0],degrees=True,lattice='cF')
-        >>> O.Schmid(N_slip=[1])
+        >>> O.Schmid(N_slip=[12])[0]
         array([[ 0.000,  0.000,  0.000],
                [ 0.577, -0.000,  0.816],
                [ 0.000,  0.000,  0.000]])
@@ -854,12 +863,14 @@ class Orientation(Rotation,Crystal):
                                   p/np.linalg.norm(p,axis=1,keepdims=True))
 
         shape = P.shape[0:1]+self.shape+(3,3)
+
         return ~self.broadcast_to(shape[:-2]) \
                @ np.broadcast_to(P.reshape(util.shapeshifter(P.shape,shape)),shape)
 
 
     def related(self: MyType,
-                model: str) -> MyType:
+                model: str,
+                target = None) -> MyType:
         """
         All orientations related to self by given relationship model.
 
@@ -867,6 +878,10 @@ class Orientation(Rotation,Crystal):
         ----------
         model : str
             Orientation relationship model selected from self.orientation_relationships.
+        target : Crystal, optional
+            Crystal to transform to.
+            Providing this parameter allows specification of non-standard lattice parameters.
+            Default is inferred from selected model and uses standard lattice parameters.
 
         Returns
         -------
@@ -894,10 +909,10 @@ class Orientation(Rotation,Crystal):
          [0.924 0.000 0.000 0.383]]
 
         """
-        lattice,o = self.relation_operations(model)
-        target = Crystal(lattice=lattice)
-        o = o.broadcast_to(o.shape+self.shape,mode='right')
-        return Orientation(rotation=o*Rotation(self.quaternion).broadcast_to(o.shape,mode='left'),
+        lattice,o = self.relation_operations(model,target)
+        target = Crystal(lattice=lattice) if target is None else target
+
+        return Orientation(rotation=o*Rotation(self.quaternion)[np.newaxis,...],  # type: ignore
                           lattice=lattice,
                           b = self.b if target.ratio['b'] is None else self.a*target.ratio['b'],
                           c = self.c if target.ratio['c'] is None else self.a*target.ratio['c'],
