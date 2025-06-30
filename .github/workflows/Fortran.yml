@@ -62,7 +62,9 @@ jobs:
           cd petsc-${PETSC_VERSION}
           ./configure --with-fc=$FC --with-cc=$CC --with-cxx=$CXX \
           --download-openmpi --download-fftw --download-hdf5 --with-hdf5-fortran-bindings=1 --download-zlib \
-          --with-mpi-f90module-visibility=1 --download-boost
+          --with-mpi-f90module-visibility=1 \
+          --download-boost --download-boost-bootstrap-arguments="--with-libraries=program_options" \
+                            --download-boost-build-options="--with-program_options"
           make all
 
       - name: DAMASK - Compile
