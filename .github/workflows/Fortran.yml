@@ -25,11 +25,6 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: brew install
-        run: |
-          brew update
-          brew install cmake wget boost
-
       - name: GCC - Install
         run: |
           brew install gcc@${GCC_V}
@@ -67,7 +62,7 @@ jobs:
           cd petsc-${PETSC_VERSION}
           ./configure --with-fc=$FC --with-cc=$CC --with-cxx=$CXX \
           --download-openmpi --download-fftw --download-hdf5 --with-hdf5-fortran-bindings=1 --download-zlib \
-          --with-mpi-f90module-visibility=1
+          --with-mpi-f90module-visibility=1 --download-boost
           make all
 
       - name: DAMASK - Compile
