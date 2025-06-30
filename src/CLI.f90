@@ -10,6 +10,7 @@
 
 module CLI
   use, intrinsic :: ISO_fortran_env
+  use, intrinsic :: ISO_C_binding
 
   use PETScSys
 
@@ -20,6 +21,13 @@ module CLI
 
   implicit none(type,external)
   private
+
+  type tCLI
+    private
+    type(c_ptr) :: object = C_NULL_ptr
+
+  end type tCLI
+
   integer,                       public, protected :: &
     CLI_restartInc = 0                                                                              !< increment at which calculation starts
   character(len=:), allocatable, public, protected :: &
@@ -30,31 +38,41 @@ module CLI
     CLI_jobName, &                                                                                  !< name of the job (will be used for DADF5 result file)
     CLI_jobID                                                                                       !< unique job ID (UUID)
 
+type :: args
+  integer(c_int) :: argc
+  type(c_ptr) :: argv
+end type
+type(tCLI) :: CLI_
+
+interface args
+  module procedure new_args
+end interface args
+
+public :: &
+  CLI_init
+
 #ifdef BOOST
 
-  interface
+interface
+  function C_CLI__new(argc, argv, worldrank) result(this) bind(C, name='CLI__new')
+    use, intrinsic :: iso_c_binding, only: c_int, c_ptr
+    integer(c_int) :: argc
+    type(c_ptr), value :: argv
+    integer(c_int) :: worldrank
+    type(c_ptr) :: this
+  end function C_CLI__new
 
-#ifndef OLD_STYLE_C_TO_FORTRAN_STRING
-    subroutine get_uuid_CPP(uuid, stat) bind(C)
-      use, intrinsic :: ISO_C_binding, only: C_INT, C_CHAR
+  subroutine C_CLI_get_parsed_args(cli, geom, load, material, numerics, jobname, uuid, restart, stat) &
+      bind(C, name='C_CLI_get_parsed_args')
+    use iso_c_binding
+    type(c_ptr), value :: cli
+    character(kind=c_char,len=:), allocatable :: geom, load, material, numerics, jobname, uuid
+    integer(c_int) :: restart
+    integer(c_int), intent(out) :: stat
+  end subroutine C_CLI_get_parsed_args
+end interface
 
-      character(kind=C_CHAR,len=:), allocatable, intent(out) :: uuid
-      integer(C_INT),                            intent(out) :: stat
-    end subroutine get_uuid_CPP
-#else
-    subroutine get_uuid_CPP(uuid, stat) bind(C)
-      use, intrinsic :: ISO_C_binding, only: C_INT, C_CHAR
-
-      character(kind=C_CHAR), dimension(36+1), intent(out) :: uuid                                  ! NULL-terminated array
-      integer(C_INT),                          intent(out) :: stat
-    end subroutine get_uuid_CPP
 #endif
-
-  end interface
-#endif
-
-  public :: &
-    CLI_init
 
 contains
 
@@ -95,11 +113,30 @@ subroutine CLI_init()
 #ifdef PETSC_DOI
   character(len=*), parameter :: PETSc_DOI = PETSC_DOI
 #endif
+#ifdef BOOST
+  integer(C_INT) :: stat
+#endif
 
-  workingDirArg = OS_getCWD()
+  type(args) :: myargs
+  myargs = args()
 
   print'(/,1x,a)', '<<<+-  CLI init  -+>>>'
 
+#ifdef BOOST
+  print *, "Using boost, experimental C++ feature"
+
+  ! https://fortran-lang.discourse.group/t/c-interoperability-command-line-arguments/5773/7
+  ! http://patorjk.com/software/taag/#p=display&f=Lean&t=DAMASK%203
+  CLI_%object = C_CLI__new(myargs%argc, myargs%argv, worldrank)
+
+  call C_CLI_get_parsed_args(CLI_%object, CLI_geomFile, CLI_loadFile, CLI_materialFile, &
+                             CLI_numericsFile, CLI_jobID, CLI_jobName, CLI_restartInc, stat)
+  if (stat /= 0) error stop 'could collect parsed args from CLI.cpp'
+  call parallelization_bcast_str(CLI_jobID)
+
+#else
+  print *, "Using classic Fortran CLI parser"
+  workingDirArg = OS_getCWD()
  ! http://patorjk.com/software/taag/#p=display&f=Lean&t=DAMASK%203
 #ifdef DEBUG
   print'(a)', IO_color([255,0,0])
@@ -219,19 +256,14 @@ subroutine CLI_init()
   print'(1x,a)',        'Load case:          '//IO_glueDiffering(CLI_loadFile,loadArg)
   print'(1x,a)',        'Material config:    '//IO_glueDiffering(CLI_materialFile,materialArg)
   if (allocated(numericsArg)) &
-    print'(1x,a)',      'Numerics config:    '//IO_glueDiffering(CLI_numericsFile,numericsArg)
-  print'(1x,a)',        'Job name:           '//CLI_jobName
-#ifdef BOOST
-   if (worldrank == 0) CLI_jobID = get_UUID()
-   call parallelization_bcast_str(CLI_jobID)
-  print'(1x,a)',        'Job ID:             '//CLI_jobID
-#endif
+    print'(1x,a)',      'Numerics config:        '//IO_glueDiffering(CLI_numericsFile,numericsArg)
+  print'(1x,a)',        'Job name:               '//CLI_jobName
   if (CLI_restartInc > 0) &
-    print'(1x,a,i0)', 'Restart increment:    ', CLI_restartInc
+    print'(1x,a,i6.6)', 'Restart from increment: ', CLI_restartInc
+#endif
 
 
 end subroutine CLI_init
-
 
 !--------------------------------------------------------------------------------------------------
 !> @brief Get argument from command line.
@@ -284,6 +316,35 @@ subroutine setWorkingDirectory(workingDirectoryArg)
 
 end subroutine setWorkingDirectory
 
+!> Initialize the derived type with a copy of the command-line arguments
+function new_args() result(this)
+  type(args) :: this
+
+  type(c_ptr), pointer :: argv(:)
+  integer(c_int) :: i, l
+
+  this%argc = command_argument_count() + 1
+  this%argv = c_malloc(int(this%argc, kind=c_size_t) * c_sizeof(this%argv))
+  call c_f_pointer(this%argv, argv, [this%argc])
+  call get_command_argument(0, length=l)
+  argv(1) = c_malloc(int(l+1, kind=c_size_t) * c_sizeof(c_null_char))
+  block
+    character(len=l+1, kind=c_char), pointer :: str
+    call c_f_pointer(argv(1), str)
+    call get_command_argument(0, value=str)
+    str(l+1:l+1) = c_null_char
+  end block
+  do i = 1, command_argument_count()
+    call get_command_argument(i, length=l)
+    argv(i+1) = c_malloc(int(l+1, kind=c_size_t) * c_sizeof(c_null_char))
+    block
+      character(len=l+1, kind=c_char), pointer :: str
+      call c_f_pointer(argv(i+1), str)
+      call get_command_argument(i, value=str)
+      str(l+1:l+1) = c_null_char
+    end block
+  end do
+end function new_args
 
 !--------------------------------------------------------------------------------------------------
 !> @brief Determine solver job name.
@@ -412,38 +473,6 @@ function relpath(path,start)
   relpath = repeat('..'//'/',remainingSlashes)//path_cleaned(posLastCommonSlash+1:len_trim(path_cleaned))
 
 end function relpath
-
-
-#ifdef BOOST
-!--------------------------------------------------------------------------------------------------
-!> @brief Generate UUID.
-!--------------------------------------------------------------------------------------------------
-function get_UUID()
-
-  character(kind=C_CHAR,len=:), allocatable :: get_UUID
-
-  integer(C_INT) :: stat
-
-
-#ifndef OLD_STYLE_C_TO_FORTRAN_STRING
-  call get_uuid_CPP(get_UUID,stat)
-  if (stat /= 0) error stop 'could not get UUID'
-#else
-  character(kind=C_CHAR,len=(36+1)) :: UUID_Cstring
-
-
-  call get_uuid_CPP(UUID_Cstring,stat)
-
-  if (stat == 0) then
-    get_UUID = c_f_string(UUID_Cstring)
-  else
-    error stop 'could not get UUID'
-  end if
-
-#endif
-end function get_UUID
-#endif
-
 
 !--------------------------------------------------------------------------------------------------
 !> @brief Print usage instructions to STDOUT and terminate program.

@@ -25,8 +25,8 @@ module OS
 #if (defined(__INTEL_COMPILER) && __INTEL_COMPILER_BUILD_DATE < 20240000) || (defined(__GFORTRAN__) && __GNUC__ < 15)
     f_c_string, &
 #endif
-    OS_isaTTY
-
+    OS_isaTTY, &
+    c_malloc
 
   interface
 
@@ -116,6 +116,12 @@ module OS
       implicit none(type,external)
       integer(C_INT) :: isatty_stdin_C
     end function isatty_stdin_C
+
+  function c_malloc(size) bind(c,name="malloc")
+    import c_size_t, c_ptr
+      integer(c_size_t), value :: size
+      type(c_ptr) :: c_malloc
+  end function c_malloc
 
   end interface
 
@@ -320,4 +326,3 @@ end subroutine OS_selfTest
 
 
 end module OS
-

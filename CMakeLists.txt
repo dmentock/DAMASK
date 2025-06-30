@@ -49,7 +49,7 @@ set(ENV{PKG_CONFIG_PATH} "$ENV{PETSC_DIR}/$ENV{PETSC_ARCH}/externalpackages:$ENV
 pkg_check_modules(HDF5 hdf5)
 pkg_check_modules(fYAML libfyaml)
 pkg_check_modules(LAPACK lapack)
-find_package(Boost)
+find_package(Boost COMPONENTS program_options)
 if(DAMASK_SOLVER_UPPER STREQUAL "GRID")
   pkg_check_modules(zlib zlib)
   pkg_check_modules(FFTW3 fftw3)
@@ -88,12 +88,14 @@ if(PETSC_VERSION VERSION_LESS 3.23.0)
   add_definitions("-DISGetIndices=ISGetIndicesF90")
   add_definitions("-DISRestoreIndices=ISRestoreIndicesF90")
 
-  add_definitions("-DSNES_CONVERGED_USER=7")
-  add_definitions("-DSNES_CONVERGED_ITERATING=0")
-  add_definitions("-DSNES_DIVERGED_USER=-12")
+  add_compile_definitions(
+    $<$<COMPILE_LANGUAGE:Fortran>:SNES_CONVERGED_USER=7>
+    $<$<COMPILE_LANGUAGE:Fortran>:SNES_CONVERGED_ITERATING=0>
+    $<$<COMPILE_LANGUAGE:Fortran>:SNES_DIVERGED_USER=-12>
+    $<$<COMPILE_LANGUAGE:Fortran>:PETSCDTSIMPLEXQUAD_DEFAULT=-1>
+    $<$<COMPILE_LANGUAGE:Fortran>:INSERT_ALL_VALUES=5>
+  )
 
-  add_definitions("-DPETSCDTSIMPLEXQUAD_DEFAULT=-1")
-  add_definitions("-DINSERT_ALL_VALUES=5")
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "")
@@ -163,7 +165,7 @@ message("PETSC_INCLUDES:\n${PETSC_INCLUDES}\n")
 
 set(CMAKE_Fortran_FLAGS_${CMAKE_BUILD_TYPE} "${BUILDCMD_PRE} ${OPENMP_FLAGS} ${STANDARD_CHECK} ${OPTIMIZATION_FLAGS} ${COMPILE_FLAGS}")
 set(CMAKE_Fortran_LINK_EXECUTABLE           "${BUILDCMD_PRE} ${CMAKE_Fortran_COMPILER} ${OPENMP_FLAGS} ${OPTIMIZATION_FLAGS} ${LINKER_FLAGS}")
-
+set(CMAKE_CXX_LINK_EXECUTABLE               "${BUILDCMD_PRE} ${CMAKE_CXX_COMPILER}     ${OPENMP_FLAGS} ${OPTIMIZATION_FLAGS} ${LINKER_FLAGS}")
 set(CMAKE_C_FLAGS_${CMAKE_BUILD_TYPE} "${CMAKE_C_FLAGS_${CMAKE_BUILD_TYPE}} ${PETSC_INCLUDES}")   # zlib installed via PETSc
 
 if(CMAKE_BUILD_TYPE STREQUAL "DEBUG")
@@ -172,8 +174,10 @@ if(CMAKE_BUILD_TYPE STREQUAL "DEBUG")
 endif()
 
 set(CMAKE_Fortran_FLAGS_${CMAKE_BUILD_TYPE} "${CMAKE_Fortran_FLAGS_${CMAKE_BUILD_TYPE}} ${PETSC_INCLUDES} ${BUILDCMD_POST}")
+set(CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}     "${CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}}     ${PETSC_INCLUDES} ${BUILDCMD_POST}")
 
 set(CMAKE_Fortran_LINK_EXECUTABLE "${CMAKE_Fortran_LINK_EXECUTABLE} <LINK_FLAGS> <FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> -L${PETSC_LIBRARY_DIRS} -lpetsc ${PETSC_EXTERNAL_LIB}")
+set(CMAKE_CXX_LINK_EXECUTABLE "${CMAKE_CXX_LINK_EXECUTABLE} <OBJECTS> -o <TARGET> <LINK_LIBRARIES> -L${PETSC_LIBRARY_DIRS} -lpetsc ${PETSC_EXTERNAL_LIB} -lubsan")
 
 if(DAMASK_SOLVER_UPPER STREQUAL "GRID")
   set(CMAKE_Fortran_LINK_EXECUTABLE "${CMAKE_Fortran_LINK_EXECUTABLE} -lz")
@@ -189,9 +193,10 @@ if(fYAML_FOUND STREQUAL "1")
   set(CMAKE_C_FLAGS_${CMAKE_BUILD_TYPE} "${CMAKE_C_FLAGS_${CMAKE_BUILD_TYPE}} -I${fYAML_INCLUDE_DIR}")
 endif()
 
-if("${Boost_FOUND}" STREQUAL TRUE)
+if(Boost_FOUND AND TARGET Boost::program_options)
+
   add_definitions(-DBOOST)
-  set(CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE} "${CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}} -I${Boost_INCLUDE_DIRS}")
+  link_libraries(Boost::program_options)
 endif()
 
 # Link with Fortran compiler requires to add C++ standard library
