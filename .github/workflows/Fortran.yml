@@ -168,12 +168,12 @@ jobs:
 
       - name: GCC - Install
         run: |
-          brew install gcc boost make open-mpi hdf5
+          brew install gcc boost make hdf5
           GCC_BIN=$(ls /opt/homebrew/bin/gcc-* | sort -V | tail -1)
           GCC_V=${GCC_BIN##*-}
-          echo "FC=/opt/homebrew/opt/open-mpi/bin/mpifort" >> $GITHUB_ENV
-          echo "CC=/opt/homebrew/opt/open-mpi/bin/mpicc" >> $GITHUB_ENV
-          echo "CXX=/opt/homebrew/opt/open-mpi/bin/mpicxx" >> $GITHUB_ENV
+          echo "FC=gfortran-${GCC_V}" >> $GITHUB_ENV
+          echo "CC=gcc-${GCC_V}" >> $GITHUB_ENV
+          echo "CXX=g++-${GCC_V}" >> $GITHUB_ENV
           echo "MAKE=/opt/homebrew/bin/gmake" >> $GITHUB_ENV
 
       - name: PETSc - Cache download
@@ -207,8 +207,7 @@ jobs:
         run: |
           cd petsc-${PETSC_VERSION}
           ./configure --with-fc=${FC} --with-cc=${CC} --with-cxx=${CXX} \
-          --with-mpi-dir="$(brew --prefix open-mpi)" \
-          --download-fftw --with-hdf5-dir="$(brew --prefix hdf5)" --with-hdf5-fortran-bindings=1 --download-zlib \
+          --download-openmpi --download-fftw --with-hdf5-dir="$(brew --prefix hdf5)" --with-hdf5-fortran-bindings=1 --download-zlib \
           --with-mpi-f90module-visibility=1
           ${MAKE} all
 
