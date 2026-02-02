@@ -168,7 +168,7 @@ jobs:
 
       - name: GCC - Install
         run: |
-          brew install gcc
+          brew install gcc boost
           GCC_BIN=$(ls /opt/homebrew/bin/gcc-* | sort -V | tail -1)
           GCC_V=${GCC_BIN##*-}
           echo "FC=gfortran-${GCC_V}" >> $GITHUB_ENV
