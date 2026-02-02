@@ -155,3 +155,68 @@ jobs:
         run: |
           ./bin/DAMASK_grid -l tensionX.yaml -g 20grains16x16x16.vti -m material.yaml -w examples/grid
           ./bin/DAMASK_mesh -l tensionZ_3g.yaml -g cube_3grains.msh -m material.yaml -w examples/mesh
+
+  macos_arm_gcc:
+
+    runs-on: macos-14
+
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: GCC - Install
+        run: |
+          brew install gcc
+          GCC_BIN=$(ls /opt/homebrew/bin/gcc-* | sort -V | tail -1)
+          GCC_V=${GCC_BIN##*-}
+          echo "FC=gfortran-${GCC_V}" >> $GITHUB_ENV
+          echo "CC=gcc-${GCC_V}" >> $GITHUB_ENV
+          echo "CXX=g++-${GCC_V}" >> $GITHUB_ENV
+
+      - name: PETSc - Cache download
+        id: petsc-download
+        uses: actions/cache@v4
+        with:
+          path: download
+          key: petsc-${{ env.PETSC_VERSION }}.tar.gz
+
+      - name: PETSc - Download
+        if: steps.petsc-download.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p download
+          curl -sSL https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz -o download/petsc-${PETSC_VERSION}.tar.gz
+
+      - name: PETSc - Prepare
+        run: |
+          tar -xf download/petsc-${PETSC_VERSION}.tar.gz -C .
+          export PETSC_DIR=${PWD}/petsc-${PETSC_VERSION}
+          export PETSC_ARCH=macos-arm
+          printenv >> $GITHUB_ENV
+
+      - name: PETSc - Cache Installation
+        id: petsc-install
+        uses: actions/cache@v4
+        with:
+          path: petsc-${{ env.PETSC_VERSION }}
+          key: petsc-${{ env.PETSC_VERSION }}-macos-arm-${{ hashFiles('**/petscversion.h') }}
+
+      - name: PETSc - Installation
+        run: |
+          cd petsc-${PETSC_VERSION}
+          ./configure --with-fc=${FC} --with-cc=${CC} --with-cxx=${CXX} \
+          --download-openmpi --download-fftw --download-hdf5 --with-hdf5-fortran-bindings=1 --download-zlib \
+          --with-mpi-f90module-visibility=1
+          make all
+
+      - name: DAMASK - Compile
+        run: |
+          cmake -B build -DGRID=ON -DMESH=ON -DCMAKE_INSTALL_PREFIX=${PWD}
+          cmake --build build --parallel
+          cmake --install build
+
+      - name: DAMASK - Run
+        run: |
+          ./bin/DAMASK_grid -l tensionX.yaml -g 20grains16x16x16.vti -m material.yaml -w examples/grid
+          ./bin/DAMASK_mesh -l tensionZ_3g.yaml -g cube_3grains.msh -m material.yaml -w examples/mesh
