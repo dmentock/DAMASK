@@ -202,7 +202,7 @@ if(fYAML_FOUND STREQUAL "1")
 endif()
 
 # Link with Fortran compiler requires to add C++ standard library
-set(CMAKE_Fortran_LINK_EXECUTABLE "${CMAKE_Fortran_LINK_EXECUTABLE} -lstdc++ ${BUILDCMD_POST}")
+set(CMAKE_Fortran_LINK_EXECUTABLE "${CMAKE_Fortran_LINK_EXECUTABLE} ${BUILDCMD_POST}")
 
 message("Fortran Compiler Flags:\n${CMAKE_Fortran_FLAGS_${CMAKE_BUILD_TYPE}}\n")
 message("C Compiler Flags:\n${CMAKE_C_FLAGS_${CMAKE_BUILD_TYPE}}\n")

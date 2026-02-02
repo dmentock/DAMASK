@@ -168,7 +168,7 @@ jobs:
 
       - name: GCC - Install
         run: |
-          brew install gcc make hdf5
+          brew install gcc make hdf5 boost
           GCC_BIN=$(ls /opt/homebrew/bin/gcc-* | sort -V | tail -1)
           GCC_V=${GCC_BIN##*-}
           echo "FC=gfortran-${GCC_V}" >> $GITHUB_ENV
@@ -207,7 +207,7 @@ jobs:
         run: |
           cd petsc-${PETSC_VERSION}
           ./configure --with-fc=${FC} --with-cc=${CC} --with-cxx=${CXX} \
-          --download-openmpi --download-fftw --download-boost --with-hdf5-dir="$(brew --prefix hdf5)" --with-hdf5-fortran-bindings=1 --download-zlib \
+          --download-openmpi --download-fftw --with-hdf5-dir="$(brew --prefix hdf5)" --with-hdf5-fortran-bindings=1 --download-zlib \
           --with-mpi-f90module-visibility=1
           ${MAKE} all
 
