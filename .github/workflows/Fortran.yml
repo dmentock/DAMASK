@@ -168,7 +168,7 @@ jobs:
 
       - name: GCC - Install
         run: |
-          brew install gcc make hdf5
+          brew install gcc make hdf5-mpi
           GCC_BIN=$(ls /opt/homebrew/bin/gcc-* | sort -V | tail -1)
           GCC_V=${GCC_BIN##*-}
           mkdir -p "${RUNNER_TEMP}/toolbin"
@@ -213,7 +213,7 @@ jobs:
           cd petsc-${PETSC_VERSION}
           ./configure --with-fc=${FC} --with-cc=${CC} --with-cxx=${CXX} CXXFLAGS="${CXXFLAGS}" \
           --download-openmpi --download-openmpi-configure-arguments="CC=${CC} CXX=${CXX} FC=${FC}" \
-          --download-fftw --download-boost --with-hdf5-dir="$(brew --prefix hdf5)" --with-hdf5-fortran-bindings=1 --download-zlib \
+          --download-fftw --download-boost --with-hdf5-dir="$(brew --prefix hdf5-mpi)" --with-hdf5-fortran-bindings=1 --download-zlib \
           --with-mpi-f90module-visibility=1 || (cat configure.log && exit 1)
           OMPI_CC=${CC} OMPI_CXX=${CXX} OMPI_FC=${FC} ${MAKE} all || (cat configure.log && exit 1)
 
