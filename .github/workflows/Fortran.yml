@@ -209,7 +209,7 @@ jobs:
           ./configure --with-fc=${FC} --with-cc=${CC} --with-cxx=${CXX} \
           --download-openmpi --download-fftw --download-boost --with-hdf5-dir="$(brew --prefix hdf5)" --with-hdf5-fortran-bindings=1 --download-zlib \
           --with-mpi-f90module-visibility=1
-          ${MAKE} all || true && cat configure.log
+          ${MAKE} all || (cat configure.log && exit 1)
 
       - name: DAMASK - Compile
         run: |
