@@ -171,9 +171,14 @@ jobs:
           brew install gcc make hdf5
           GCC_BIN=$(ls /opt/homebrew/bin/gcc-* | sort -V | tail -1)
           GCC_V=${GCC_BIN##*-}
+          mkdir -p "${RUNNER_TEMP}/toolbin"
+          ln -sf "/opt/homebrew/bin/gcc-${GCC_V}" "${RUNNER_TEMP}/toolbin/gcc"
+          ln -sf "/opt/homebrew/bin/g++-${GCC_V}" "${RUNNER_TEMP}/toolbin/g++"
+          echo "${RUNNER_TEMP}/toolbin" >> $GITHUB_PATH
           echo "FC=gfortran-${GCC_V}" >> $GITHUB_ENV
           echo "CC=gcc-${GCC_V}" >> $GITHUB_ENV
           echo "CXX=g++-${GCC_V}" >> $GITHUB_ENV
+          echo "CXXFLAGS=-std=c++20" >> $GITHUB_ENV
           echo "MAKE=/opt/homebrew/bin/gmake" >> $GITHUB_ENV
 
       - name: PETSc - Cache download
@@ -207,9 +212,10 @@ jobs:
         run: |
           cd petsc-${PETSC_VERSION}
           ./configure --with-fc=${FC} --with-cc=${CC} --with-cxx=${CXX} \
-          --download-openmpi --download-fftw --download-boost --with-hdf5-dir="$(brew --prefix hdf5)" --with-hdf5-fortran-bindings=1 --download-zlib \
+          --download-openmpi --download-openmpi-configure-arguments="CC=${CC} CXX=${CXX} FC=${FC}" \
+          --download-fftw --download-boost --with-hdf5-dir="$(brew --prefix hdf5)" --with-hdf5-fortran-bindings=1 --download-zlib \
           --with-mpi-f90module-visibility=1 || (cat configure.log && exit 1)
-          ${MAKE} all || (cat configure.log && exit 1)
+          OMPI_CC=${CC} OMPI_CXX=${CXX} OMPI_FC=${FC} ${MAKE} all || (cat configure.log && exit 1)
 
       - name: DAMASK - Compile
         run: |
