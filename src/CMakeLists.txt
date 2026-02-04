@@ -30,6 +30,7 @@ foreach(VARIANT GRID MESH TEST)
       endif()
       target_link_libraries(${executable_name} PRIVATE damask_c_${VARIANT_LOWER})
       install(TARGETS ${executable_name} RUNTIME DESTINATION bin)
+
       INSTALL(CODE "execute_process( \
         COMMAND ${CMAKE_COMMAND} -E create_symlink \
         ${executable_name} \
