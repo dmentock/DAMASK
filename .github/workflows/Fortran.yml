@@ -160,6 +160,13 @@ jobs:
 
     runs-on: macos-14
 
+    env:
+      CC: /opt/homebrew/bin/gcc-15
+      CXX: /opt/homebrew/bin/g++-15
+      FC: /opt/homebrew/bin/gfortran-15
+      CXXFLAGS: -std=c++20
+      MAKE: /opt/homebrew/bin/gmake
+
     strategy:
       fail-fast: false
 
@@ -169,17 +176,6 @@ jobs:
       - name: GCC - Install
         run: |
           brew install gcc make hdf5-mpi
-          GCC_BIN=$(ls /opt/homebrew/bin/gcc-* | sort -V | tail -1)
-          GCC_V=${GCC_BIN##*-}
-          mkdir -p "${RUNNER_TEMP}/toolbin"
-          ln -sf "/opt/homebrew/bin/gcc-${GCC_V}" "${RUNNER_TEMP}/toolbin/gcc"
-          ln -sf "/opt/homebrew/bin/g++-${GCC_V}" "${RUNNER_TEMP}/toolbin/g++"
-          echo "${RUNNER_TEMP}/toolbin" >> $GITHUB_PATH
-          echo "FC=gfortran-${GCC_V}" >> $GITHUB_ENV
-          echo "CC=gcc-${GCC_V}" >> $GITHUB_ENV
-          echo "CXX=g++-${GCC_V}" >> $GITHUB_ENV
-          echo "CXXFLAGS=-std=c++20" >> $GITHUB_ENV
-          echo "MAKE=/opt/homebrew/bin/gmake" >> $GITHUB_ENV
 
       - name: PETSc - Cache download
         id: petsc-download
