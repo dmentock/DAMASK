@@ -225,5 +225,5 @@ jobs:
 
       - name: DAMASK - Run
         run: |
-          ./bin/DAMASK_grid -l tensionX.yaml -g 20grains16x16x16.vti -m material.yaml -w examples/grid
-          ./bin/DAMASK_mesh -l tensionZ_3g.yaml -g cube_3grains.msh -m material.yaml -w examples/mesh
+          ./build/src/DAMASK_grid -l tensionX.yaml -g 20grains16x16x16.vti -m material.yaml -w examples/grid
+          ./build/src/DAMASK_mesh -l tensionZ_3g.yaml -g cube_3grains.msh -m material.yaml -w examples/mesh
