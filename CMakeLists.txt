@@ -41,14 +41,14 @@ project(DAMASK
         HOMEPAGE_URL https://damask-multiphysics.org
         LANGUAGES Fortran C CXX VERSION "${DAMASK_VERSION_CMAKE}")
 
-if(NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL "LLVMFlang")
-  if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL ${CMAKE_Fortran_COMPILER_ID})
-    message(FATAL_ERROR "C compiler (${CMAKE_C_COMPILER_ID}) does not match Fortran compiler (${CMAKE_Fortran_COMPILER_ID})")
-  endif()
-  if(NOT ${CMAKE_CXX_COMPILER_ID} STREQUAL ${CMAKE_Fortran_COMPILER_ID})
-    message(FATAL_ERROR "C++ compiler (${CMAKE_CXX_COMPILER_ID}) does not match Fortran compiler (${CMAKE_Fortran_COMPILER_ID})")
-  endif()
-endif()
+# if(NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL "LLVMFlang")
+  # if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL ${CMAKE_Fortran_COMPILER_ID})
+  #   message(FATAL_ERROR "C compiler (${CMAKE_C_COMPILER_ID}) does not match Fortran compiler (${CMAKE_Fortran_COMPILER_ID})")
+  # endif()
+  # if(NOT ${CMAKE_CXX_COMPILER_ID} STREQUAL ${CMAKE_Fortran_COMPILER_ID})
+  #   message(FATAL_ERROR "C++ compiler (${CMAKE_CXX_COMPILER_ID}) does not match Fortran compiler (${CMAKE_Fortran_COMPILER_ID})")
+  # endif()
+# endif()
 
 set(CMAKE_Fortran_PREPROCESS "ON")
 
