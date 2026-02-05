@@ -18,15 +18,7 @@
 #include <array>
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/program_options/options_description.hpp>
-#include <boost/program_options/parsers.hpp>
-#include <boost/program_options/value_semantic.hpp>
-#include <boost/program_options/variables_map.hpp>
-#include <boost/system/detail/error_code.hpp>
-#include <boost/version.hpp>
-#if BOOST_VERSION >= 108600
-#include <boost/uuid/basic_random_generator.hpp>
-#endif
+#include <boost/program_options.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <cstdlib>
