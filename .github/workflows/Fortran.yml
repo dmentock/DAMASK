@@ -11,171 +11,20 @@ env:
 
 jobs:
 
-  ubuntu_gcc:
-
-    runs-on: ubuntu-24.04
-
-    strategy:
-      matrix:
-        gcc_v: [11, 12, 13, 14]
-      fail-fast: false
-
-    env:
-      GCC_V: ${{ matrix.gcc_v }}
-
-    steps:
-
-      - uses: actions/checkout@v4
-
-      - name: GCC - Install
-        run: |
-          sudo apt-get update
-          sudo apt-get install liblapack-dev
-          sudo apt-get install -y gcc-${GCC_V} gfortran-${GCC_V} g++-${GCC_V}
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${GCC_V} 100 \
-          --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-${GCC_V} \
-          --slave /usr/bin/g++      g++      /usr/bin/g++-${GCC_V} \
-          --slave /usr/bin/gcov     gcov     /usr/bin/gcov-${GCC_V}
-
-      - name: PETSc - Cache download
-        id: petsc-download
-        uses: actions/cache@v4
-        with:
-          path: download
-          key: petsc-${{ env.PETSC_VERSION }}.tar.gz
-
-      - name: PETSc - Download
-        if: steps.petsc-download.outputs.cache-hit != 'true'
-        run: |
-          wget -q https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz -P download
-
-      - name: PETSc - Prepare
-        run: |
-          tar -xf download/petsc-${PETSC_VERSION}.tar.gz -C .
-          export PETSC_DIR=${PWD}/petsc-${PETSC_VERSION}
-          export PETSC_ARCH=gcc${GCC_V}
-          printenv >> $GITHUB_ENV
-
-      - name: PETSc - Cache Installation
-        id: petsc-install
-        uses: actions/cache@v4
-        with:
-          path: petsc-${{ env.PETSC_VERSION }}
-          key: petsc-${{ env.PETSC_VERSION }}-gcc${{ matrix.gcc_v }}-${{ hashFiles('**/petscversion.h') }}
-
-      - name: PETSc - Installation
-        run: |
-          cd petsc-${PETSC_VERSION}
-          ./configure --with-fc=gfortran --with-cc=gcc --with-cxx=g++ \
-          --download-openmpi --download-fftw --download-hdf5 --with-hdf5-fortran-bindings=1 --download-zlib \
-          --with-mpi-f90module-visibility=1
-          make all
-
-      - name: DAMASK - Compile
-        run: |
-          cmake -B build -DGRID=ON -DMESH=ON -DCMAKE_INSTALL_PREFIX=${PWD}
-          cmake --build build --parallel
-          cmake --install build
-
-      - name: DAMASK - Run
-        run: |
-          ./bin/DAMASK_grid -l tensionX.yaml -g 20grains16x16x16.vti -m material.yaml -w examples/grid
-          ./bin/DAMASK_mesh -l tensionZ_3g.yaml -g cube_3grains.msh -m material.yaml -w examples/mesh
-
-
-  ubuntu_Intel:
-
-    runs-on: ubuntu-24.04
-
-    strategy:
-      fail-fast: false
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Intel - Install
-        run: |
-          sudo apt-get remove -y \
-          '^aspnetcore-runtime.*' '^clang.*' '^dotnet.*' '^gfortran.*' '^mono.*' '^llvm.*' '^ruby.*' '^r-cran.*' '^r-base.*' '^dotnet.*' '^apache2.*'
-          sudo apt-get autoremove -y
-          wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
-          | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
-          echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
-          | sudo tee /etc/apt/sources.list.d/oneAPI.list
-          sudo apt-get update
-          sudo apt-get install \
-          intel-basekit intel-hpckit
-          source /opt/intel/oneapi/setvars.sh
-          printenv >> $GITHUB_ENV
-
-      - name: PETSc - Cache download
-        id: petsc-download
-        uses: actions/cache@v4
-        with:
-          path: download
-          key: petsc-${{ env.PETSC_VERSION }}.tar.gz
-
-      - name: PETSc - Download
-        if: steps.petsc-download.outputs.cache-hit != 'true'
-        run: |
-          wget -q https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz -P download
-
-      - name: PETSc - Prepare
-        run: |
-          tar -xf download/petsc-${PETSC_VERSION}.tar.gz -C .
-          export PETSC_DIR=${PWD}/petsc-${PETSC_VERSION}
-          export PETSC_ARCH=intel
-          printenv >> $GITHUB_ENV
-
-      - name: PETSc - Cache installation
-        id: petsc-install
-        uses: actions/cache@v4
-        with:
-          path: petsc-${{ env.PETSC_VERSION }}
-          key: petsc-${{ env.PETSC_VERSION }}-intel-${{ hashFiles('**/petscversion.h') }}
-
-      - name: PETSc - Install
-        run: |
-          cd petsc-${PETSC_VERSION}
-          ./configure \
-          --with-fc=mpiifx \
-          --with-cc=mpiicx \
-          --with-cxx=mpiicpx \
-          --with-x=0 \
-          --download-fftw --download-hdf5 --with-hdf5-fortran-bindings=1 --download-zlib
-          make all
-
-      - name: DAMASK - Compile
-        run: |
-          cmake -B build -DGRID=ON -DMESH=ON -DCMAKE_INSTALL_PREFIX=${PWD}
-          cmake --build build --parallel
-          cmake --install build
-
-      - name: DAMASK - Run
-        run: |
-          ./bin/DAMASK_grid -l tensionX.yaml -g 20grains16x16x16.vti -m material.yaml -w examples/grid
-          ./bin/DAMASK_mesh -l tensionZ_3g.yaml -g cube_3grains.msh -m material.yaml -w examples/mesh
-
   macos_arm_gcc:
 
     runs-on: macos-14
 
-    env:
-      CC: /opt/homebrew/bin/gcc-15
-      CXX: /opt/homebrew/bin/g++-15
-      FC: /opt/homebrew/bin/gfortran-15
-      CXXFLAGS: -std=c++20
-      MAKE: /opt/homebrew/bin/gmake
-
     strategy:
       fail-fast: false
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: GCC - Install
+      - name: Install
         run: |
-          brew install gcc make hdf5-mpi
+          brew install make gcc
+          echo "MAKE=$(brew --prefix)/bin/gmake" >> $GITHUB_ENV
 
       - name: PETSc - Cache download
         id: petsc-download
@@ -206,12 +55,16 @@ jobs:
 
       - name: PETSc - Installation
         run: |
+          FC=$(ls /opt/homebrew/bin/gfortran-* | sort -V | tail -1)
           cd petsc-${PETSC_VERSION}
-          ./configure --with-fc=${FC} --with-cc=${CC} --with-cxx=${CXX} CXXFLAGS="${CXXFLAGS}" \
-          --download-openmpi --download-openmpi-configure-arguments="CC=${CC} CXX=${CXX} FC=${FC}" \
-          --download-fftw --download-boost --with-hdf5-dir="$(brew --prefix hdf5-mpi)" --with-hdf5-fortran-bindings=1 --download-zlib \
+          ./configure \
+          --with-cc=clang --with-cxx=clang++ --with-fc=$FC \
+          --download-openmpi --download-openmpi-configure-arguments="CC=clang CXX=clang++ FC=$FC" \
+          --download-hdf5 --with-hdf5-fortran-bindings=1 --with-hdf5-cxx-bindings=1 \
+          --download-fftw --download-boost \
+          --download-zlib \
           --with-mpi-f90module-visibility=1 || (cat configure.log && exit 1)
-          OMPI_CC=${CC} OMPI_CXX=${CXX} OMPI_FC=${FC} ${MAKE} all || (cat configure.log && exit 1)
+          ${MAKE} all || (cat configure.log && exit 1)
 
       - name: DAMASK - Compile
         run: |
@@ -221,5 +74,5 @@ jobs:
 
       - name: DAMASK - Run
         run: |
-          ./bin/DAMASK_grid -l tensionX.yaml -g 20grains16x16x16.vti -m material.yaml -w examples/grid
-          ./bin/DAMASK_mesh -l tensionZ_3g.yaml -g cube_3grains.msh -m material.yaml -w examples/mesh
+          ./build/src/DAMASK_grid -l tensionX.yaml -g 20grains16x16x16.vti -m material.yaml -w examples/grid
+          ./build/src/DAMASK_mesh -l tensionZ_3g.yaml -g cube_3grains.msh -m material.yaml -w examples/mesh
