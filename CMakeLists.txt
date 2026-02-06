@@ -47,62 +47,55 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 
-  message(STATUS "=== ISO_Fortran_binding.h discovery ===")
+  message(STATUS "=== ISO_Fortran_binding.h discovery (Homebrew GCC) ===")
   message(STATUS "CMAKE_Fortran_COMPILER='${CMAKE_Fortran_COMPILER}'")
-  message(STATUS "CMAKE_Fortran_COMPILER_ID='${CMAKE_Fortran_COMPILER_ID}'")
 
-  set(ISO_HDR "")
-
-  # Try wrapper query (usually fails like you saw)
+  # Get underlying compiler from mpif90 -show (you already do this)
   execute_process(
-    COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=ISO_Fortran_binding.h
-    OUTPUT_VARIABLE ISO_HDR
+    COMMAND ${CMAKE_Fortran_COMPILER} -show
+    OUTPUT_VARIABLE MPI_SHOW
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
-  message(STATUS "Try 1 out='${ISO_HDR}'")
+  separate_arguments(MPI_SHOW_LIST NATIVE_COMMAND "${MPI_SHOW}")
+  list(GET MPI_SHOW_LIST 0 UNDERLYING_FC)
+  message(STATUS "Underlying FC: '${UNDERLYING_FC}'")
 
-  # If wrapper didn't give a path, ask wrapper what real compiler it uses
-  if(ISO_HDR STREQUAL "" OR ISO_HDR STREQUAL "ISO_Fortran_binding.h" OR NOT EXISTS "${ISO_HDR}")
-    set(MPI_SHOW "")
-    foreach(showflag IN ITEMS "-show" "--showme:command" "-showme" "-compile-info")
-      execute_process(
-        COMMAND ${CMAKE_Fortran_COMPILER} ${showflag}
-        OUTPUT_VARIABLE MPI_SHOW
-        ERROR_QUIET
-        RESULT_VARIABLE MPI_SHOW_RC
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-      )
-      if(MPI_SHOW_RC EQUAL 0 AND NOT MPI_SHOW STREQUAL "")
-        message(STATUS "mpif90 ${showflag} -> '${MPI_SHOW}'")
-        break()
-      endif()
-    endforeach()
+  # Ask that compiler where libgcc is. This *does* return a real path.
+  execute_process(
+    COMMAND ${UNDERLYING_FC} -print-libgcc-file-name
+    OUTPUT_VARIABLE LIBGCC_FILE
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  message(STATUS "libgcc file:   '${LIBGCC_FILE}'")
 
-    # Extract first token as the underlying compiler command
-    if(NOT MPI_SHOW STREQUAL "")
-      separate_arguments(MPI_SHOW_LIST NATIVE_COMMAND "${MPI_SHOW}")
-      list(GET MPI_SHOW_LIST 0 UNDERLYING_FC)
-      message(STATUS "Underlying FC guessed as: '${UNDERLYING_FC}'")
+  # libgcc path is:
+  # .../lib/gcc/<target>/<version>/libgcc.a
+  # so include dir is:
+  # .../lib/gcc/<target>/<version>/include
+  get_filename_component(GCC_VER_DIR "${LIBGCC_FILE}" DIRECTORY)
+  set(GCC_INCLUDE_DIR "${GCC_VER_DIR}/include")
+  set(ISO_HDR "${GCC_INCLUDE_DIR}/ISO_Fortran_binding.h")
 
-      execute_process(
-        COMMAND ${UNDERLYING_FC} -print-file-name=ISO_Fortran_binding.h
-        OUTPUT_VARIABLE ISO_HDR
-        ERROR_VARIABLE ISO_HDR_ERR
-        RESULT_VARIABLE ISO_HDR_RC
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-      )
-      message(STATUS "Try 2: ${UNDERLYING_FC} -print-file-name=ISO_Fortran_binding.h")
-      message(STATUS "  rc='${ISO_HDR_RC}' out='${ISO_HDR}' err='${ISO_HDR_ERR}'")
-    endif()
-  endif()
+  message(STATUS "Candidate include dir: '${GCC_INCLUDE_DIR}'")
+  message(STATUS "Candidate header:      '${ISO_HDR}'")
 
   if(EXISTS "${ISO_HDR}")
-    get_filename_component(ISO_DIR "${ISO_HDR}" DIRECTORY)
-    message(STATUS "Resolved ISO_Fortran_binding.h: '${ISO_HDR}'")
-    message(STATUS "Adding include dir:             '${ISO_DIR}'")
-    include_directories(SYSTEM "${ISO_DIR}")
+    message(STATUS "Found ISO_Fortran_binding.h ✅")
+    include_directories(SYSTEM "${GCC_INCLUDE_DIR}")
   else()
-    message(WARNING "Could not locate ISO_Fortran_binding.h. Final candidate: '${ISO_HDR}'")
+    # Some GCC layouts also place it in include-fixed (rare for this header, but cheap to check)
+    set(GCC_INCLUDE_FIXED_DIR "${GCC_VER_DIR}/include-fixed")
+    set(ISO_HDR_FIXED "${GCC_INCLUDE_FIXED_DIR}/ISO_Fortran_binding.h")
+
+    message(STATUS "Candidate include-fixed dir: '${GCC_INCLUDE_FIXED_DIR}'")
+    message(STATUS "Candidate header (fixed):     '${ISO_HDR_FIXED}'")
+
+    if(EXISTS "${ISO_HDR_FIXED}")
+      message(STATUS "Found ISO_Fortran_binding.h in include-fixed ✅")
+      include_directories(SYSTEM "${GCC_INCLUDE_FIXED_DIR}")
+    else()
+      message(FATAL_ERROR "Could not find ISO_Fortran_binding.h near '${LIBGCC_FILE}'.")
+    endif()
   endif()
 
   message(STATUS "=== End ISO_Fortran_binding.h discovery ===")

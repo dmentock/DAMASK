@@ -33,27 +33,34 @@ jobs:
           path: download
           key: petsc-${{ env.PETSC_VERSION }}.tar.gz
 
+      - name: PETSc - Cache Installation
+        id: petsc-install
+        uses: actions/cache@v4
+        with:
+          path: petsc-${{ env.PETSC_VERSION }}
+          key: petsc-${{ env.PETSC_VERSION }}-macos-arm-${{ hashFiles('.github/workflows/Fortran.yml') }}
+          restore-keys: |
+            petsc-${{ env.PETSC_VERSION }}-macos-arm-
+
       - name: PETSc - Download
         if: steps.petsc-download.outputs.cache-hit != 'true'
         run: |
           mkdir -p download
           curl -sSL https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz -o download/petsc-${PETSC_VERSION}.tar.gz
 
+      - name: PETSc - Env
+        run: |
+          echo "PETSC_DIR=${PWD}/petsc-${PETSC_VERSION}" >> $GITHUB_ENV
+          echo "PETSC_ARCH=macos-arm" >> $GITHUB_ENV
+
       - name: PETSc - Prepare
+        if: steps.petsc-install.outputs.cache-hit != 'true'
         run: |
           tar -xf download/petsc-${PETSC_VERSION}.tar.gz -C .
-          export PETSC_DIR=${PWD}/petsc-${PETSC_VERSION}
-          export PETSC_ARCH=macos-arm
           printenv >> $GITHUB_ENV
 
-      - name: PETSc - Cache Installation
-        id: petsc-install
-        uses: actions/cache@v4
-        with:
-          path: petsc-${{ env.PETSC_VERSION }}
-          key: petsc-${{ env.PETSC_VERSION }}-macos-arm-${{ hashFiles('**/petscversion.h') }}
-
       - name: PETSc - Installation
+        if: steps.petsc-install.outputs.cache-hit != 'true'
         run: |
           FC=$(ls /opt/homebrew/bin/gfortran-* | sort -V | tail -1)
           cd petsc-${PETSC_VERSION}
