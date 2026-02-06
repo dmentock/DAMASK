@@ -19,7 +19,7 @@ foreach(VARIANT GRID MESH TEST)
         PROPERTIES Fortran_MODULE_DIRECTORY
           ${CMAKE_CURRENT_BINARY_DIR}/${VARIANT}_${CMAKE_BUILD_TYPE})
       add_executable(${executable_name} $<TARGET_OBJECTS:damask_fortran_${VARIANT_LOWER}>)
-      set_target_properties(${executable_name} PROPERTIES LINKER_LANGUAGE CXX)
+      set_target_properties(${executable_name} PROPERTIES LINKER_LANGUAGE Fortran)
 
       add_library(damask_c_${VARIANT_LOWER} STATIC ${damask_c})
       target_compile_definitions(damask_c_${VARIANT_LOWER} PUBLIC ${VARIANT})

@@ -90,7 +90,7 @@ subroutine CLI_init()
 #elif PETSC_VERSION_MINOR==24
 #define PETSC_DOI '10.2172/2998643'
 #endif
-#if !(defined(BOOST))
+#if !(defined(BOOST) && !defined(OLD_STYLE_C_TO_FORTRAN_STRING))
   character(len=:), allocatable :: &
     commandLine, &                                                                                  !< command line call as string
     flag, &                                                                                         !< individual flag

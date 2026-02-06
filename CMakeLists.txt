@@ -41,11 +41,9 @@ project(DAMASK
         HOMEPAGE_URL https://damask-multiphysics.org
         LANGUAGES Fortran C CXX VERSION "${DAMASK_VERSION_CMAKE}")
 
-# since we now use LINKER_LANGUAGE CXX for the main executable, we need to manually include the ISO_Fortran_binding.h dir
-if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-  execute_process(COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=include
-                  OUTPUT_VARIABLE GFORTRAN_INCLUDE_DIR)
-  include_directories(SYSTEM "${GFORTRAN_INCLUDE_DIR}")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-stdlib=libc++>)
+  add_link_options($<$<LINK_LANGUAGE:CXX>:-stdlib=libc++>)
 endif()
 
 set(CMAKE_Fortran_PREPROCESS "ON")
