@@ -46,37 +46,52 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   add_link_options($<$<LINK_LANGUAGE:CXX>:-stdlib=libc++>)
 endif()
 
+
   message(STATUS "=== ISO_Fortran_binding.h discovery ===")
   message(STATUS "CMAKE_Fortran_COMPILER='${CMAKE_Fortran_COMPILER}'")
   message(STATUS "CMAKE_Fortran_COMPILER_ID='${CMAKE_Fortran_COMPILER_ID}'")
 
   set(ISO_HDR "")
 
-  # 1) Try the configured Fortran compiler (may be mpif90/mpifort)
+  # Try wrapper query (usually fails like you saw)
   execute_process(
     COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=ISO_Fortran_binding.h
     OUTPUT_VARIABLE ISO_HDR
-    ERROR_VARIABLE  ISO_HDR_ERR
-    RESULT_VARIABLE ISO_HDR_RC
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
-  message(STATUS "Try 1: ${CMAKE_Fortran_COMPILER} -print-file-name=ISO_Fortran_binding.h")
-  message(STATUS "  rc='${ISO_HDR_RC}' out='${ISO_HDR}' err='${ISO_HDR_ERR}'")
+  message(STATUS "Try 1 out='${ISO_HDR}'")
 
-  # 2) If that didn't give an absolute path, fall back to gfortran
+  # If wrapper didn't give a path, ask wrapper what real compiler it uses
   if(ISO_HDR STREQUAL "" OR ISO_HDR STREQUAL "ISO_Fortran_binding.h" OR NOT EXISTS "${ISO_HDR}")
-    find_program(GFORTRAN_EXE gfortran)
-    message(STATUS "find_program(gfortran) -> '${GFORTRAN_EXE}'")
-
-    if(GFORTRAN_EXE)
+    set(MPI_SHOW "")
+    foreach(showflag IN ITEMS "-show" "--showme:command" "-showme" "-compile-info")
       execute_process(
-        COMMAND ${GFORTRAN_EXE} -print-file-name=ISO_Fortran_binding.h
+        COMMAND ${CMAKE_Fortran_COMPILER} ${showflag}
+        OUTPUT_VARIABLE MPI_SHOW
+        ERROR_QUIET
+        RESULT_VARIABLE MPI_SHOW_RC
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+      if(MPI_SHOW_RC EQUAL 0 AND NOT MPI_SHOW STREQUAL "")
+        message(STATUS "mpif90 ${showflag} -> '${MPI_SHOW}'")
+        break()
+      endif()
+    endforeach()
+
+    # Extract first token as the underlying compiler command
+    if(NOT MPI_SHOW STREQUAL "")
+      separate_arguments(MPI_SHOW_LIST NATIVE_COMMAND "${MPI_SHOW}")
+      list(GET MPI_SHOW_LIST 0 UNDERLYING_FC)
+      message(STATUS "Underlying FC guessed as: '${UNDERLYING_FC}'")
+
+      execute_process(
+        COMMAND ${UNDERLYING_FC} -print-file-name=ISO_Fortran_binding.h
         OUTPUT_VARIABLE ISO_HDR
-        ERROR_VARIABLE  ISO_HDR_ERR
+        ERROR_VARIABLE ISO_HDR_ERR
         RESULT_VARIABLE ISO_HDR_RC
         OUTPUT_STRIP_TRAILING_WHITESPACE
       )
-      message(STATUS "Try 2: ${GFORTRAN_EXE} -print-file-name=ISO_Fortran_binding.h")
+      message(STATUS "Try 2: ${UNDERLYING_FC} -print-file-name=ISO_Fortran_binding.h")
       message(STATUS "  rc='${ISO_HDR_RC}' out='${ISO_HDR}' err='${ISO_HDR_ERR}'")
     endif()
   endif()
@@ -91,6 +106,7 @@ endif()
   endif()
 
   message(STATUS "=== End ISO_Fortran_binding.h discovery ===")
+
 
 
 set(CMAKE_Fortran_PREPROCESS "ON")
