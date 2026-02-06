@@ -64,10 +64,20 @@ if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
   if(ISO_HDR STREQUAL "ISO_Fortran_binding.h" OR ISO_HDR STREQUAL "")
-    message(FATAL_ERROR "Could not locate ISO_Fortran_binding.h using '${UNDERLYING_FC}'.")
+    execute_process(
+      COMMAND ${UNDERLYING_FC} -print-libgcc-file-name
+      OUTPUT_VARIABLE LIBGCC_FILE
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if(LIBGCC_FILE STREQUAL "")
+      message(FATAL_ERROR "Could not locate ISO_Fortran_binding.h using '${UNDERLYING_FC}'.")
+    endif()
+    get_filename_component(GCC_VER_DIR "${LIBGCC_FILE}" DIRECTORY)
+    set(GFORTRAN_INCLUDE_DIR "${GCC_VER_DIR}/include")
+  else()
+    get_filename_component(GFORTRAN_INCLUDE_DIR "${ISO_HDR}" DIRECTORY)
   endif()
-
-  get_filename_component(GFORTRAN_INCLUDE_DIR "${ISO_HDR}" DIRECTORY)
+  message(STATUS "ISO_Fortran_binding.h include dir: '${GFORTRAN_INCLUDE_DIR}'")
   add_compile_options(
     $<$<COMPILE_LANGUAGE:C>:-idirafter>  $<$<COMPILE_LANGUAGE:C>:${GFORTRAN_INCLUDE_DIR}>
     $<$<COMPILE_LANGUAGE:CXX>:-idirafter> $<$<COMPILE_LANGUAGE:CXX>:${GFORTRAN_INCLUDE_DIR}>
