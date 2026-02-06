@@ -3,6 +3,7 @@ on: [push]
 
 env:
   PETSC_VERSION: '3.24.2'
+  PETSC_CACHE_VERSION: '1'
   HOMEBREW_NO_ANALYTICS: 'ON'     # Make Homebrew installation a little quicker
   HOMEBREW_NO_AUTO_UPDATE: 'ON'
   HOMEBREW_NO_BOTTLE_SOURCE_FALLBACK: 'ON'
@@ -38,7 +39,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: petsc-${{ env.PETSC_VERSION }}
-          key: petsc-${{ env.PETSC_VERSION }}-macos-arm-${{ hashFiles('.github/workflows/Fortran.yml') }}
+          key: petsc-${{ env.PETSC_VERSION }}-macos-arm-${{ env.PETSC_CACHE_VERSION }}
           restore-keys: |
             petsc-${{ env.PETSC_VERSION }}-macos-arm-
 
