@@ -46,11 +46,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   add_link_options($<$<LINK_LANGUAGE:CXX>:-stdlib=libc++>)
 endif()
 
-
-  message(STATUS "=== ISO_Fortran_binding.h discovery (Homebrew GCC) ===")
-  message(STATUS "CMAKE_Fortran_COMPILER='${CMAKE_Fortran_COMPILER}'")
-
-  # Get underlying compiler from mpif90 -show (you already do this)
+if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
   execute_process(
     COMMAND ${CMAKE_Fortran_COMPILER} -show
     OUTPUT_VARIABLE MPI_SHOW
@@ -58,47 +54,25 @@ endif()
   )
   separate_arguments(MPI_SHOW_LIST NATIVE_COMMAND "${MPI_SHOW}")
   list(GET MPI_SHOW_LIST 0 UNDERLYING_FC)
-  message(STATUS "Underlying FC: '${UNDERLYING_FC}'")
-
-  # Ask that compiler where libgcc is. This *does* return a real path.
-  execute_process(
-    COMMAND ${UNDERLYING_FC} -print-libgcc-file-name
-    OUTPUT_VARIABLE LIBGCC_FILE
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-  message(STATUS "libgcc file:   '${LIBGCC_FILE}'")
-
-  # libgcc path is:
-  # .../lib/gcc/<target>/<version>/libgcc.a
-  # so include dir is:
-  # .../lib/gcc/<target>/<version>/include
-  get_filename_component(GCC_VER_DIR "${LIBGCC_FILE}" DIRECTORY)
-  set(GCC_INCLUDE_DIR "${GCC_VER_DIR}/include")
-  set(ISO_HDR "${GCC_INCLUDE_DIR}/ISO_Fortran_binding.h")
-
-  message(STATUS "Candidate include dir: '${GCC_INCLUDE_DIR}'")
-  message(STATUS "Candidate header:      '${ISO_HDR}'")
-
-  if(EXISTS "${ISO_HDR}")
-    message(STATUS "Found ISO_Fortran_binding.h ✅")
-    include_directories(SYSTEM "${GCC_INCLUDE_DIR}")
-  else()
-    # Some GCC layouts also place it in include-fixed (rare for this header, but cheap to check)
-    set(GCC_INCLUDE_FIXED_DIR "${GCC_VER_DIR}/include-fixed")
-    set(ISO_HDR_FIXED "${GCC_INCLUDE_FIXED_DIR}/ISO_Fortran_binding.h")
-
-    message(STATUS "Candidate include-fixed dir: '${GCC_INCLUDE_FIXED_DIR}'")
-    message(STATUS "Candidate header (fixed):     '${ISO_HDR_FIXED}'")
-
-    if(EXISTS "${ISO_HDR_FIXED}")
-      message(STATUS "Found ISO_Fortran_binding.h in include-fixed ✅")
-      include_directories(SYSTEM "${GCC_INCLUDE_FIXED_DIR}")
-    else()
-      message(FATAL_ERROR "Could not find ISO_Fortran_binding.h near '${LIBGCC_FILE}'.")
-    endif()
+  if(UNDERLYING_FC STREQUAL "")
+    set(UNDERLYING_FC gfortran)
   endif()
 
-  message(STATUS "=== End ISO_Fortran_binding.h discovery ===")
+  execute_process(
+    COMMAND ${UNDERLYING_FC} -print-file-name=ISO_Fortran_binding.h
+    OUTPUT_VARIABLE ISO_HDR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  if(ISO_HDR STREQUAL "ISO_Fortran_binding.h" OR ISO_HDR STREQUAL "")
+    message(FATAL_ERROR "Could not locate ISO_Fortran_binding.h using '${UNDERLYING_FC}'.")
+  endif()
+
+  get_filename_component(GFORTRAN_INCLUDE_DIR "${ISO_HDR}" DIRECTORY)
+  add_compile_options(
+    $<$<COMPILE_LANGUAGE:C>:-idirafter>  $<$<COMPILE_LANGUAGE:C>:${GFORTRAN_INCLUDE_DIR}>
+    $<$<COMPILE_LANGUAGE:CXX>:-idirafter> $<$<COMPILE_LANGUAGE:CXX>:${GFORTRAN_INCLUDE_DIR}>
+  )
+endif()
 
 
 
