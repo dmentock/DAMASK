@@ -46,74 +46,51 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   add_link_options($<$<LINK_LANGUAGE:CXX>:-stdlib=libc++>)
 endif()
 
-if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-  message(STATUS "=== ISO_Fortran_binding.h discovery (GNU Fortran) ===")
-  message(STATUS "CMAKE_Fortran_COMPILER        = '${CMAKE_Fortran_COMPILER}'")
-  message(STATUS "CMAKE_Fortran_COMPILER_ID     = '${CMAKE_Fortran_COMPILER_ID}'")
-  message(STATUS "CMAKE_Fortran_COMPILER_VERSION= '${CMAKE_Fortran_COMPILER_VERSION}'")
+  message(STATUS "=== ISO_Fortran_binding.h discovery ===")
+  message(STATUS "CMAKE_Fortran_COMPILER='${CMAKE_Fortran_COMPILER}'")
+  message(STATUS "CMAKE_Fortran_COMPILER_ID='${CMAKE_Fortran_COMPILER_ID}'")
 
-  # 1) Try whatever CMake is using as Fortran compiler (might be mpifort wrapper)
+  set(ISO_HDR "")
+
+  # 1) Try the configured Fortran compiler (may be mpif90/mpifort)
   execute_process(
     COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=ISO_Fortran_binding.h
-    OUTPUT_VARIABLE GFORTRAN_ISO_BINDING
-    ERROR_VARIABLE  GFORTRAN_ISO_BINDING_ERR
-    RESULT_VARIABLE GFORTRAN_ISO_BINDING_RC
+    OUTPUT_VARIABLE ISO_HDR
+    ERROR_VARIABLE  ISO_HDR_ERR
+    RESULT_VARIABLE ISO_HDR_RC
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
-  message(STATUS "Try 1: '${CMAKE_Fortran_COMPILER} -print-file-name=ISO_Fortran_binding.h'")
-  message(STATUS "  rc    = '${GFORTRAN_ISO_BINDING_RC}'")
-  message(STATUS "  out   = '${GFORTRAN_ISO_BINDING}'")
-  if(NOT GFORTRAN_ISO_BINDING_ERR STREQUAL "")
-    message(STATUS "  err   = '${GFORTRAN_ISO_BINDING_ERR}'")
-  endif()
+  message(STATUS "Try 1: ${CMAKE_Fortran_COMPILER} -print-file-name=ISO_Fortran_binding.h")
+  message(STATUS "  rc='${ISO_HDR_RC}' out='${ISO_HDR}' err='${ISO_HDR_ERR}'")
 
-  # 2) Fallback to plain gfortran if wrapper returned bare name or empty
-  if(GFORTRAN_ISO_BINDING STREQUAL "ISO_Fortran_binding.h" OR GFORTRAN_ISO_BINDING STREQUAL "")
-    execute_process(
-      COMMAND gfortran -print-file-name=ISO_Fortran_binding.h
-      OUTPUT_VARIABLE GFORTRAN_ISO_BINDING
-      ERROR_VARIABLE  GFORTRAN_ISO_BINDING_ERR
-      RESULT_VARIABLE GFORTRAN_ISO_BINDING_RC
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    message(STATUS "Try 2: 'gfortran -print-file-name=ISO_Fortran_binding.h'")
-    message(STATUS "  rc    = '${GFORTRAN_ISO_BINDING_RC}'")
-    message(STATUS "  out   = '${GFORTRAN_ISO_BINDING}'")
-    if(NOT GFORTRAN_ISO_BINDING_ERR STREQUAL "")
-      message(STATUS "  err   = '${GFORTRAN_ISO_BINDING_ERR}'")
+  # 2) If that didn't give an absolute path, fall back to gfortran
+  if(ISO_HDR STREQUAL "" OR ISO_HDR STREQUAL "ISO_Fortran_binding.h" OR NOT EXISTS "${ISO_HDR}")
+    find_program(GFORTRAN_EXE gfortran)
+    message(STATUS "find_program(gfortran) -> '${GFORTRAN_EXE}'")
+
+    if(GFORTRAN_EXE)
+      execute_process(
+        COMMAND ${GFORTRAN_EXE} -print-file-name=ISO_Fortran_binding.h
+        OUTPUT_VARIABLE ISO_HDR
+        ERROR_VARIABLE  ISO_HDR_ERR
+        RESULT_VARIABLE ISO_HDR_RC
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+      message(STATUS "Try 2: ${GFORTRAN_EXE} -print-file-name=ISO_Fortran_binding.h")
+      message(STATUS "  rc='${ISO_HDR_RC}' out='${ISO_HDR}' err='${ISO_HDR_ERR}'")
     endif()
   endif()
 
-  # 3) Validate and apply
-  if(EXISTS "${GFORTRAN_ISO_BINDING}")
-    get_filename_component(GFORTRAN_INCLUDE_DIR "${GFORTRAN_ISO_BINDING}" DIRECTORY)
-
-    message(STATUS "Resolved ISO_Fortran_binding.h = '${GFORTRAN_ISO_BINDING}'")
-    message(STATUS "Adding include directory        = '${GFORTRAN_INCLUDE_DIR}'")
-
-    # Sanity checks
-    if(EXISTS "${GFORTRAN_INCLUDE_DIR}/ISO_Fortran_binding.h")
-      message(STATUS "Sanity: header exists in include dir ✅")
-    else()
-      message(WARNING "Sanity: header NOT found in include dir ❌ (unexpected)")
-    endif()
-
-    # Helpful extra: show any other likely include dirs CMake detected
-    if(DEFINED CMAKE_Fortran_IMPLICIT_INCLUDE_DIRECTORIES)
-      message(STATUS "CMAKE_Fortran_IMPLICIT_INCLUDE_DIRECTORIES = '${CMAKE_Fortran_IMPLICIT_INCLUDE_DIRECTORIES}'")
-    endif()
-
-    include_directories(SYSTEM "${GFORTRAN_INCLUDE_DIR}")
+  if(EXISTS "${ISO_HDR}")
+    get_filename_component(ISO_DIR "${ISO_HDR}" DIRECTORY)
+    message(STATUS "Resolved ISO_Fortran_binding.h: '${ISO_HDR}'")
+    message(STATUS "Adding include dir:             '${ISO_DIR}'")
+    include_directories(SYSTEM "${ISO_DIR}")
   else()
-    message(WARNING "Could not locate ISO_Fortran_binding.h via GNU Fortran.")
-    message(STATUS  "Final candidate path was: '${GFORTRAN_ISO_BINDING}'")
-    if(DEFINED CMAKE_Fortran_IMPLICIT_INCLUDE_DIRECTORIES)
-      message(STATUS "CMAKE_Fortran_IMPLICIT_INCLUDE_DIRECTORIES = '${CMAKE_Fortran_IMPLICIT_INCLUDE_DIRECTORIES}'")
-    endif()
+    message(WARNING "Could not locate ISO_Fortran_binding.h. Final candidate: '${ISO_HDR}'")
   endif()
 
   message(STATUS "=== End ISO_Fortran_binding.h discovery ===")
-endif()
 
 
 set(CMAKE_Fortran_PREPROCESS "ON")
