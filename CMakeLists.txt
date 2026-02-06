@@ -44,6 +44,12 @@ project(DAMASK
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-stdlib=libc++>)
   add_link_options($<$<LINK_LANGUAGE:CXX>:-stdlib=libc++>)
+  if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    execute_process(COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=include
+                    OUTPUT_VARIABLE GFORTRAN_INCLUDE_DIR
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    include_directories(SYSTEM "${GFORTRAN_INCLUDE_DIR}")
+  endif()
 endif()
 
 set(CMAKE_Fortran_PREPROCESS "ON")
