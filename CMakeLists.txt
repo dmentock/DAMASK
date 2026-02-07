@@ -47,16 +47,16 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-  execute_process(
-    COMMAND ${CMAKE_Fortran_COMPILER} -show
-    OUTPUT_VARIABLE MPI_SHOW
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-  separate_arguments(MPI_SHOW_LIST NATIVE_COMMAND "${MPI_SHOW}")
-  list(GET MPI_SHOW_LIST 0 UNDERLYING_FC)
-  if(UNDERLYING_FC STREQUAL "")
+  # execute_process(
+  #   COMMAND ${CMAKE_Fortran_COMPILER} -show
+  #   OUTPUT_VARIABLE MPI_SHOW
+  #   OUTPUT_STRIP_TRAILING_WHITESPACE
+  # )
+  # separate_arguments(MPI_SHOW_LIST NATIVE_COMMAND "${MPI_SHOW}")
+  # list(GET MPI_SHOW_LIST 0 UNDERLYING_FC)
+  # if(UNDERLYING_FC STREQUAL "")
     set(UNDERLYING_FC gfortran)
-  endif()
+  # endif()
 
   execute_process(
     COMMAND ${UNDERLYING_FC} -print-file-name=ISO_Fortran_binding.h
